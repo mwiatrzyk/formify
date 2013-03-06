@@ -1,5 +1,8 @@
+from formify.event import listeners_of
 from formify.utils import helpers
 from formify.undefined import Undefined
+
+schema = helpers.importlater('formify.schema')
 
 
 class validator_property(object):
@@ -74,6 +77,9 @@ class ValidatorProxy(object):
         self._owner = owner
         self._validator = validator
 
+    def __str__(self):
+        return "<%s: %s>" % (self.__class__.__name__, self._validator)
+
     def __getattr__(self, name):
         prop = getattr(self._validator.__class__, name, None)
         storage = self._get_storage(self._owner, self._validator)
@@ -81,7 +87,7 @@ class ValidatorProxy(object):
             if prop is None:
                 return storage[name]
             else:
-                return prop.fget(self, storage[name])
+                return prop.fget(self, storage[name])  # Use original getter for same result
         else:
             return getattr(self._validator, name)
 
@@ -94,7 +100,7 @@ class ValidatorProxy(object):
             if prop is None:
                 storage[name] = value
             else:
-                storage[name] = prop.fset(self, value)
+                storage[name] = prop.fset(self, value)  # Use original setter for same result
 
     def __delattr__(self, name):
         storage = self._get_storage(self._owner, self._validator)
@@ -163,6 +169,9 @@ class Validator(object):
         self.autoconvert = autoconvert
         self.key = key
 
+    def __call__(self, value):
+        return self.process(value, owner=None)
+
     @property
     def python_type(self):
         raise NotImplementedError()
@@ -180,33 +189,68 @@ class Validator(object):
     def default(self, value):
         return helpers.maybe_callable(value)
 
-    def getval(self, owner):
-        storage = self.__proxy__._get_storage(owner, self)
-        value = storage.get('value', Undefined)
-        return value
-
-    def setval(self, owner, value):
-        value = self.prevalidate(value)
+    def process(self, value, owner=None):
+        # Create temporary schema with single validator and use it as owner if
+        # no other owner was given
+        if owner is None:
+            owner = schema.Schema()
+            owner.__validators__[self.key] = self
+        self.__proxy__._set_storage(owner, self)['raw_value'] = value
+        value = self.prevalidate(value, owner)
         if self.autoconvert:
-            value = self.convert(value)
-        elif not self.typecheck(value):
-            raise TypeError("validator '%s' does not accept values of type %s" % (self.key, type(value)))
-        value = self.postvalidate(value)
+            value = self.convert(value, owner)
+        elif not self.typecheck(value, owner):
+            raise TypeError("validator %r does not accept values of type %s" % (self, type(value)))
+        value = self.postvalidate(value, owner)
         storage = self.__proxy__._set_storage(owner, self)
         storage['value'] = value
         return value
 
-    def prevalidate(self, value, other=None):
-        return value
+    def prevalidate(self, value, owner):
+        return self._notify_all('prevalidate', value, owner)
 
-    def convert(self, value, other=None):
-        return self.python_type(value)
+    def postvalidate(self, value, owner):
+        return self._notify_all('postvalidate', value, owner)
 
-    def typecheck(self, value, other=None):
+    def convert(self, value, owner):
+        try:
+            return self.python_type(value)
+        except (ValueError, TypeError), e:
+            raise exc.ConversionError(
+                "unable to convert '%(value)s' to %(python_type)s object" %
+                {'value': value, 'python_type': self.python_type})
+
+    def typecheck(self, value, owner):
         return isinstance(value, self.python_type)
 
-    def postvalidate(self, value, other=None):
+    def param(self, name, owner, default=Undefined):
+        """Get validator's parameter via validator proxy object, so we can be
+        sure the value is always up to date.
+
+        If *owner* is unknown (i.e. set to ``None``) this method just reads the
+        parameter by calling ``getattr`` on current validator object.
+        """
+        if owner is None:
+            return getattr(self, name, default)
+        else:
+            return getattr(owner[self.key], name, default)
+
+    ### PRIVATE
+
+    def _notify_all(self, event, value, owner):
+        for listener in listeners_of(self, event):
+            value = listener(owner, owner[self.key], value)
         return value
 
+    def _get_value(self, owner):
+        storage = self.__proxy__._get_storage(owner, self)
+        value = storage.get('value', Undefined)
+        return value
 
+    def _set_value(self, owner, value):
+        return self.process(value, owner)
+
+
+# Import base validators to make it importable via 'formify.validators'
+# namespace
 from formify.validators.base import *
