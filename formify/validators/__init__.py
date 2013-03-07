@@ -1,4 +1,4 @@
-from formify.event import listeners_of
+from formify import event
 from formify.utils import helpers
 from formify.undefined import Undefined
 
@@ -207,10 +207,10 @@ class Validator(object):
         return value
 
     def prevalidate(self, value, owner):
-        return self._notify_all('prevalidate', value, owner)
+        return event.pipeline(self, 'prevalidate', -1, owner, self.key, value)
 
     def postvalidate(self, value, owner):
-        return self._notify_all('postvalidate', value, owner)
+        return event.pipeline(self, 'postvalidate', -1, owner, self.key, value)
 
     def convert(self, value, owner):
         try:
@@ -236,11 +236,6 @@ class Validator(object):
             return getattr(owner[self.key], name, default)
 
     ### PRIVATE
-
-    def _notify_all(self, event, value, owner):
-        for listener in listeners_of(self, event):
-            value = listener(owner, owner[self.key], value)
-        return value
 
     def _get_value(self, owner):
         storage = self.__proxy__._get_storage(owner, self)

@@ -1,6 +1,7 @@
 import copy
 
 from formify.utils import collections
+from formify.event import add_listener
 from formify.undefined import Undefined
 from formify.validators import Validator, ValidatorProxy
 
@@ -40,15 +41,19 @@ class Schema(object):
     ...
     ...     @event.listens_for(foo, 'postvalidate')
     ...     @event.listens_for(baz, 'prevalidate')
-    ...     def prevalidate_baz(self, sender, value):
+    ...     def prevalidate_baz(self, key, value):
     ...         if hasattr(value, 'strip'):
     ...             return value.strip()
     ...         else:
     ...             return value
 
-    #>>> @Test.listens_for('prevalidate')
-    #... def prevalidate_string(self, name, value):
-    #...     return value
+    >>> @event.listens_for(Test, 'prevalidate', validators.String)
+    ... def prevalidate_all_strings(self, key, value):
+    ...     return value
+
+    >>> @event.listens_for(Test, 'prevalidate', 'bar', 'baz')
+    ... def prevalidate_bar_and_baz(self, key, value):
+    ...     return value
 
     >>> t = Test()
     >>> t['foo'].label  # Access validator's label via object
@@ -121,3 +126,14 @@ class Schema(object):
             return self.__validators__[key].__proxy__(self, self.__validators__[key])
         else:
             raise KeyError(key)
+
+    @classmethod
+    def on_add_listener(sender, event, listener):
+        event, eargs = event[0], event[1:]
+        for arg in eargs:
+            if isinstance(arg, type) and issubclass(arg, Validator):
+                for k, v in sender.__validators__.iteritems():
+                    if isinstance(v, arg):
+                        add_listener(v, event, listener)
+            elif isinstance(arg, basestring) and arg in sender.__validators__:
+                add_listener(sender.__validators__[arg], event, listener)
