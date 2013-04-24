@@ -4,18 +4,20 @@
 def add_listener(sender, event, listener):
     """Register event listener.
 
-    The behaviour of this function can be changed for each *sender* by
-    supplying its class with ``on_add_listener`` method accepting *event* and
-    *listener* as parameters.
+    This function is used to append new event listener to the end of list of
+    event listeners registered for given *sender* and *event*. Default
+    behaviour of this method can be overriden by defining :meth:`add_listener`
+    method in *sender*'s class. If such method is found, it is called with
+    *event* and *listener* arguments and no further processing is performed.
 
     :param sender:
         event sender
     :param event:
-        event name string or tuple object
+        event identifier
     :param listener:
         listener callable
     """
-    registrar = getattr(sender, 'on_add_listener', None)
+    registrar = getattr(sender, 'add_listener', None)
     if registrar is not None:
         registrar(event, listener)
     else:
@@ -25,24 +27,23 @@ def add_listener(sender, event, listener):
 
 
 def get_listeners(sender, event):
-    """Event listeners generator.
+    """Return list of all event listeners registered for given event.
 
-    The behaviour of this function can be changed for each *sender* by
-    supplying its class with ``on_get_listeners`` method accepting *event* as
-    single parameter.
+    This function returns list of event listeners preserving listener
+    registration order. Default behaviour can be changed by defining
+    :meth:`get_listeners` method in *sender*'s class. If one is found, it is
+    called with *event* argument and its return value is returned.
 
     :param sender:
         event sender
     :param event:
-        event name string or tuple object
+        event identifier
     """
-    provider = getattr(sender, 'on_get_listeners', None)
+    provider = getattr(sender, 'get_listeners', None)
     if provider is not None:
-        source = provider(event)
+        return provider(event)
     else:
-        source = getattr(sender, '_event_listeners', {}).get(event, [])
-    for listener in source:
-        yield listener
+        return getattr(sender, '_event_listeners', {}).get(event, [])
 
 
 def notify(sender, event, *args, **kwargs):
@@ -51,11 +52,11 @@ def notify(sender, event, *args, **kwargs):
     :param sender:
         event sender
     :param event:
-        event name string or tuple object
+        event identifier
     :param *args:
-        positional args forwarded to each listener callable
+        positional args forwarded to listeners
     :param **kwargs:
-        named args forwarded to each listener callable
+        keyword args forwarded to listeners
     """
     for listener in get_listeners(sender, event):
         listener(*args, **kwargs)
@@ -68,22 +69,18 @@ def pipeline(sender, event, key, *args, **kwargs):
     :param sender:
         event sender
     :param event:
-        event name string or tuple object
+        event identifier
     :param key:
         specifies which positional or keyword argument should be forwarded to
         next listener and finally returned as this function's result. Following
         values are allowed:
 
-        ``int`` number
-            if positional arg should be used; the value is arg's position
-            within *args* tuple (can be negative as well)
-
-        ``str`` value
-            if keyword arg should be used; the value is name of keyword arg
+        * index of positional arg (``int``)
+        * name of keyword argument (``str``)
     :param *args:
-        positional args forwarded to each listener callable
+        positional args forwarded to listeners
     :param **kwargs:
-        named args forwarded to each listener callable
+        keyword args forwarded to listeners
     """
     if isinstance(key, int):
         args = list(args)

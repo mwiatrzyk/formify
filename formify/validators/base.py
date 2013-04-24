@@ -2,51 +2,28 @@ import re
 import decimal
 
 from formify import exc
-from formify.validators import validator_property, Validator
+from formify.validators import Validator
 
 __all__ = [
-    'BaseString', 'String', 'Regex', 'Numeric', 'Int', 'Float', 'Decimal',
-    'Bool']
+    'BaseString', 'String', 'Regex', 'Numeric', 'Integer', 'Float', 'Decimal',
+    'Boolean']
 
 
 class BaseString(Validator):
     """Common base class for all string validators."""
-    python_type = unicode
+
+    @property
+    def python_type(self):
+        return unicode
 
 
 class String(BaseString):
-    """Validate unicode string values.
+    """String input validator.
 
     :param length_max:
-        maximal allowed length of output string
+        maximal string length
     :param length_min:
-        minimal allowed length of output string
-
-    Standalone usage examples:
-
-    >>> validator = String()
-    >>> validator(1)
-    u'1'
-    >>> validator('foo')
-    u'foo'
-    >>> String(3, 2).process('ab')
-    u'ab'
-    >>> String(3, 2).process('a')
-    Traceback (most recent call last):
-    ...
-    ValidationError: number of characters must be between 2 and 3
-    >>> String(3, 2).process('abcd')
-    Traceback (most recent call last):
-    ...
-    ValidationError: number of characters must be between 2 and 3
-    >>> String(3).process('abcd')
-    Traceback (most recent call last):
-    ...
-    ValidationError: number of characters must not be greater than 3
-    >>> String(length_min=3).process('ab')
-    Traceback (most recent call last):
-    ...
-    ValidationError: number of characters must not be less than 3
+        minimal string length
     """
 
     def __init__(self, length_max=None, length_min=None, **kwargs):
@@ -54,27 +31,24 @@ class String(BaseString):
         self.length_max = length_max
         self.length_min = length_min
 
-    def postvalidate(self, value, owner):
-        value = super(String, self).postvalidate(value, owner)
-        length_max = self.param('length_max', owner)
-        length_min = self.param('length_min', owner)
+    def postvalidate(self, value):
+        value = super(String, self).postvalidate(value)
         params = {
-            'length_min': length_min,
-            'length_max': length_max,
-        }
-        if length_min is not None and\
-           length_max is not None and\
-           not (length_min <= len(value) <= length_max):
+            'length_min': self.length_min,
+            'length_max': self.length_max}
+        if self.length_min is not None and\
+           self.length_max is not None and\
+           not (self.length_min <= len(value) <= self.length_max):
             raise exc.ValidationError(
                 "number of characters must be between %(length_min)s and "
                 "%(length_max)s" % params)
-        elif length_min is not None and\
-             len(value) < length_min:
+        elif self.length_min is not None and\
+             len(value) < self.length_min:
             raise exc.ValidationError(
                 "number of characters must not be less than %(length_min)s" %
                 params)
-        elif length_max is not None and\
-             len(value) > length_max:
+        elif self.length_max is not None and\
+             len(value) > self.length_max:
             raise exc.ValidationError(
                 "number of characters must not be greater than %(length_max)s"
                 % params)
@@ -82,15 +56,12 @@ class String(BaseString):
 
 
 class Regex(BaseString):
-    """Validate strings against given regular expression.
+    """Validates input against given regular expression.
 
-    >>> validator = Regex('[A-Z]{3}')
-    >>> validator('ABC')
-    u'ABC'
-    >>> validator('abc')
-    Traceback (most recent call last):
-    ...
-    ValidationError: value 'abc' does not match pattern '[A-Z]{3}'
+    :param pattern:
+        regular expression pattern
+    :param flags:
+        regular expression flags (see :mod:`re` for details)
     """
 
     def __init__(self, pattern, flags=0, **kwargs):
@@ -98,14 +69,12 @@ class Regex(BaseString):
         self.pattern = pattern
         self.flags = flags
 
-    def postvalidate(self, value, owner):
-        pattern = self.param('pattern', owner)
-        flags = self.param('flags', owner)
+    def postvalidate(self, value):
+        value = super(Regex, self).postvalidate(value)
         params = {
             'value': value,
-            'pattern': pattern,
-        }
-        if not re.match(pattern, value, flags):
+            'pattern': self.pattern}
+        if not re.match(self.pattern, value, self.flags):
             raise exc.ValidationError(
                 "value '%(value)s' does not match pattern '%(pattern)s'" %
                 params)
@@ -113,68 +82,49 @@ class Regex(BaseString):
 
 
 class Numeric(Validator):
-    """Common base class for all numeric validators."""
+    """Base class for validators performing numeric input validation.
+
+    :param value_min:
+        minimal allowed input value
+    :param value_max:
+        maximal allowed input value
+    """
 
     def __init__(self, value_min=None, value_max=None, **kwargs):
         super(Numeric, self).__init__(**kwargs)
         self.value_min = value_min
         self.value_max = value_max
 
-    def postvalidate(self, value, owner):
-        value = super(Numeric, self).postvalidate(value, owner)
-        value_min = self.param('value_min', owner)
-        value_max = self.param('value_max', owner)
+    def postvalidate(self, value):
+        value = super(Numeric, self).postvalidate(value)
         params = {
-            'value_min': value_min,
-            'value_max': value_max,
-        }
-        if value_min is not None and\
-           value_max is not None and\
-           not (value_min <= value <= value_max):
+            'value_min': self.value_min,
+            'value_max': self.value_max}
+        if self.value_min is not None and\
+           self.value_max is not None and\
+           not (self.value_min <= value <= self.value_max):
             raise exc.ValidationError(
                 "value must be between %(value_min)s and %(value_max)s" %
                 params)
-        elif value_min is not None and\
-             value < value_min:
+        elif self.value_min is not None and\
+             value < self.value_min:
             raise exc.ValidationError(
                 "value must not be less than %(value_min)s" % params)
-        elif value_max is not None and\
-             value > value_max:
+        elif self.value_max is not None and\
+             value > self.value_max:
             raise exc.ValidationError(
                 "value must not be greater than %(value_max)s" % params)
         return value
 
 
-class Int(Numeric):
-    """Validate integer numbers.
+class Integer(Numeric):
+    """Validates integer number input."""
 
-    >>> validator = Int()
-    >>> validator('foo')
-    Traceback (most recent call last):
-    ...
-    ConversionError: unable to convert 'foo' to integer number
-    >>> validator(123)
-    123
-    >>> validator('-11')
-    -11
-    >>> Int(2, 3).process(2)
-    2
-    >>> Int(2, 3).process(1)
-    Traceback (most recent call last):
-    ...
-    ValidationError: value must be between 2 and 3
-    >>> Int(2).process(1)
-    Traceback (most recent call last):
-    ...
-    ValidationError: value must not be less than 2
-    >>> Int(value_max=2).process(3)
-    Traceback (most recent call last):
-    ...
-    ValidationError: value must not be greater than 2
-    """
-    python_type = int
+    @property
+    def python_type(self):
+        return int
 
-    def convert(self, value, owner):
+    def from_string(self, value):
         try:
             return self.python_type(value)
         except ValueError:
@@ -184,98 +134,65 @@ class Int(Numeric):
 
 
 class Float(Numeric):
-    """Floating point input validator.
+    """Validates floating point number input."""
 
-    >>> validator = Float(0, 3.14)
-    >>> validator('-5.35')
-    Traceback (most recent call last):
-    ...
-    ValidationError: value must be between 0 and 3.14
-    >>> validator('foo')
-    Traceback (most recent call last):
-    ...
-    ConversionError: unable to convert 'foo' to floating point number
-    >>> validator(3.14)
-    3.14
-    """
-    python_type = float
+    @property
+    def python_type(self):
+        return float
 
-    def convert(self, value, owner):
+    def from_string(self, value):
         try:
             return self.python_type(value)
-        except ValueError, e:
+        except ValueError:
             raise exc.ConversionError(
-                "unable to convert '%(value)s' to floating point number" %
-                {'value': value})
+                "unable to convert '%(value)s' to floating point (a.k.a. real) "
+                "number" % {'value': value})
 
 
 class Decimal(Numeric):
-    """Decimal input validator.
+    """Validates decimal number input."""
 
-    >>> decimal = Decimal()
-    >>> decimal(10)
-    Decimal('10')
-    >>> decimal(10.5)
-    Decimal('10.5')
-    >>> decimal('3.14159')
-    Decimal('3.14159')
-    >>> decimal(True)
-    Decimal('1')
-    >>> decimal({})
-    Traceback (most recent call last):
-    ...
-    TypeError: Cannot convert {} to Decimal
-    >>> decimal('12d')
-    Traceback (most recent call last):
-    ...
-    ConversionError: unable to convert '12d' to decimal number
-    """
-    python_type = decimal.Decimal
+    @property
+    def python_type(self):
+        return decimal.Decimal
 
-    def convert(self, value, owner):
+    def from_string(self, value):
         try:
             return self.python_type(value)
-        except decimal.InvalidOperation, e:
+        except decimal.InvalidOperation:
             raise exc.ConversionError(
                 "unable to convert '%(value)s' to decimal number" %
                 {'value': value})
 
 
-class Bool(Validator):
-    """Boolean input validator.
+class Boolean(Validator):
+    """Validates boolean value input.
 
-    >>> validator = Bool()
-    >>> validator(True)
-    True
-    >>> validator(1)
-    True
-    >>> validator(None)
-    False
-    >>> validator('')
-    False
-    >>> validator('yes')
-    True
-    >>> validator('foo')
-    Traceback (most recent call last):
-    ...
-    ConversionError: cannot convert 'foo' to boolean
+    :param trues:
+        sequence of phrases that evaluate to ``True``. Default case-insensitive
+        true-evaluating phrases are: ``1``, ``y``, ``on``, ``yes``, ``true``
+    :param falses:
+        sequence of phrases that evaluate to ``False``. Default
+        case-insensitive false-evaluating phrases are: ``0``, ``n``, ``off``,
+        ``no``, ``false``
     """
-    python_type = bool
+
+    @property
+    def python_type(self):
+        return bool
 
     def __init__(self, trues=None, falses=None, **kwargs):
-        super(Bool, self).__init__(**kwargs)
+        super(Boolean, self).__init__(**kwargs)
         self.trues = trues
         self.falses = falses
 
-    def convert(self, value, owner):
-        if not value:
+    def from_string(self, value):
+        if not value:  # empty string
             return False
-        elif not isinstance(value, basestring):
-            return self.python_type(value)
         else:
             value = value.lower()
-            trues = set(self.param('trues', owner) or ['1', 'y', 'on', 'yes', 'true'])
-            falses = set(self.param('falses', owner) or ['0', 'n', 'off', 'no', 'false'])
+            trues = set(self.trues or ['1', 'y', 'on', 'yes', 'true'])
+            falses = set(self.falses or ['0', 'n', 'off', 'no', 'false'])
             if value in trues:
                 return True
             elif value in falses:

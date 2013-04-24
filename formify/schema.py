@@ -1,134 +1,94 @@
 import copy
+import collections
 
-from formify.utils import collections
 from formify.event import add_listener
 from formify.undefined import Undefined
-from formify.validators import Validator, ValidatorProxy
+from formify.validators import Validator
+from formify.utils.decorators import memoized_property
+from formify.utils.collections import OrderedDict
 
 
 class SchemaMeta(type):
+    """Metaclass for class :class:`Schema`."""
 
-    def __new__(tcls, name, bases, dct):
-        # TODO: check if we are inheriting from another schema and inherit its
-        # validators as well
+    @property
+    def __validators__(cls):
         validators = []
-        for attr, value in dct.items():
-            if isinstance(value, Validator):
-                if value.key is None:
-                    value.key = attr
-                validators.append((value.key, value))
-                del dct[attr]
+        for k in dir(cls):
+            if not k.startswith('_'):
+                v = getattr(cls, k)
+                if isinstance(v, Validator):
+                    if v._key is None:
+                        v._key = k
+                    validators.append((v._key, v))
         validators.sort(key=lambda x: x[1]._creation_order)
-        dct['__validators__'] = collections.OrderedDict(validators)
-        return super(SchemaMeta, tcls).__new__(tcls, name, bases, dct)
-
-    def __getattr__(cls, name):
-        if name in cls.__validators__:
-            return cls.__validators__[name]
-        else:
-            raise AttributeError("'%s' object has no attribute '%s'" % (cls.__class__.__name__, name))
+        return OrderedDict(validators)
 
 
 class Schema(object):
-    """
-    >>> from formify import event, validators
-    >>> from formify.undefined import Undefined
-
-    >>> class Test(Schema):
-    ...     foo = validators.String(2)
-    ...     bar = validators.Int(default='1')
-    ...     baz = validators.Bool(default=lambda: 'Yes')
-    ...
-    ...     @event.listens_for(foo, 'postvalidate')
-    ...     @event.listens_for(baz, 'prevalidate')
-    ...     def prevalidate_baz(self, key, value):
-    ...         if hasattr(value, 'strip'):
-    ...             return value.strip()
-    ...         else:
-    ...             return value
-
-    >>> @event.listens_for(Test, 'prevalidate', validators.String)
-    ... def prevalidate_all_strings(self, key, value):
-    ...     return value
-
-    >>> @event.listens_for(Test, 'prevalidate', 'bar', 'baz')
-    ... def prevalidate_bar_and_baz(self, key, value):
-    ...     return value
-
-    >>> t = Test()
-    >>> t['foo'].label  # Access validator's label via object
-    u'Foo'
-    >>> Test.foo.label  # Access validator's label via class
-    u'Foo'
-    >>> t['baz'].default
-    'Yes'
-    >>> t['baz'].default = Undefined  # Override validator's default for object (not class)
-    >>> t['baz'].default
-    Undefined
-    >>> t.__class__.baz.default   # Still old value when accessed via class
-    'Yes'
-    >>> del t['baz'].default  # Remove object's default and restore class default
-    >>> t['baz'].default
-    'Yes'
-    >>> t.foo
-    Undefined
-    >>> t.foo = 1
-    >>> t.foo
-    u'1'
-    >>> t.foo = 'bar'
-    Traceback (most recent call last):
-    ...
-    ValidationError: number of characters must not be greater than 2
-    >>> t['foo'].length_max = 3  # Override length constraint
-    >>> t.foo = 'bar'  # No error now
-    >>> t.bar
-    1
-    >>> t.baz = 1
-    >>> t.baz
-    True
-    >>> t.baz = 'no'
-    >>> t.baz
-    False
-    >>> t.baz = ' yes '  # Check if prevalidator works
-    >>> t.baz
-    True
-    >>> t.foo = ' ab'  # There also is same prevalidator for 'foo'
-    >>> t.foo
-    u'ab'
-    >>> Test.foo(' ab')  # Call in standalone mode (no owner)
-    u'ab'
-    """
     __metaclass__ = SchemaMeta
 
     def __init__(self, **kwargs):
+        self._bound_validators = {}
+        for name, validator in self.__validators__.items():
+            validator.bind(self)
+            if name not in kwargs:
+                default = validator.default
+                if default is not Undefined:
+                    kwargs[name] = copy.deepcopy(default)
         for k, v in kwargs.items():
             setattr(self, k, v)
-        for name, attr in self.__validators__.items():
-            if name not in kwargs:
-                default = attr.default
-                if default is not Undefined:
-                    setattr(self, name, copy.deepcopy(default))
 
-    def __getattr__(self, name):
-        if name not in self.__validators__:
-            return super(Schema, self).__getattribute__(name)
-        else:
-            return self.__validators__[name]._get_value(self)
+    def __iter__(self):
+        for k in self.__validators__:
+            if k in self._bound_validators:
+                yield k
+
+    def __contains__(self, key):
+        return key in self._bound_validators
 
     def __setattr__(self, name, value):
-        if name not in self.__validators__:
+        if name.startswith('_'):
             super(Schema, self).__setattr__(name, value)
+        elif name in self._bound_validators:
+            self._bound_validators[name].process(value)
+        elif name in self.__validators__:  # Rebind removed validator
+            self.__validators__[name].bind(self).process(value)
         else:
-            self.__validators__[name]._set_value(self, value)
+            raise AttributeError("no validator named '%s'" % name)
+
+    def __getattribute__(self, name):
+        if name.startswith('_') or name not in self.__validators__:
+            return super(Schema, self).__getattribute__(name)
+        elif name in self._bound_validators:
+            return self._bound_validators[name].value
+        else:
+            raise AttributeError("validator '%s' was deleted from schema" % name)
+
+    def __delattr__(self, name):
+        if name in self._bound_validators:
+            self._bound_validators[name].process(Undefined)
+        else:
+            super(Schema, self).__delattr__(name)
 
     def __getitem__(self, key):
-        if key in self.__validators__:
-            return self.__validators__[key].__proxy__(self, self.__validators__[key])
+        if key in self._bound_validators:
+            return self._bound_validators[key]
         else:
             raise KeyError(key)
 
+    def __delitem__(self, key):
+        if key in self._bound_validators:
+            self._bound_validators[key].unbind()
+        else:
+            raise KeyError(key)
+
+    @memoized_property
+    def __validators__(self):
+        return self.__class__.__validators__
+
     @classmethod
-    def on_add_listener(sender, event, listener):
+    def add_listener(sender, event, listener):
         event, eargs = event[0], event[1:]
         for arg in eargs:
             if isinstance(arg, type) and issubclass(arg, Validator):

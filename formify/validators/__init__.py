@@ -1,249 +1,183 @@
-from formify import event
+import weakref
+
+from formify import exc, event
 from formify.utils import helpers
 from formify.undefined import Undefined
 
-schema = helpers.importlater('formify.schema')
-
-
-class validator_property(object):
-    """A property decorator that allows to share setters and getter between
-    validator objects and validator proxies.
-
-    This differs from standard property decorator in a fact that here we have
-    both setters and getters accepting 2 parameters: property owner and
-    value. Getters will receive previously set value as second parameters, and
-    getters must return value instead of setting it somewhere. This allows
-    to use getter and setter functions in different scope.
-    """
-
-    def __init__(self, fget=None, fset=None, name=None, doc=None):
-        self.fget = fget
-        self.fset = (lambda s, v: v) if fset is True else fset
-        self.__doc__ = doc
-        self.__name__ = name
-        if self.fget is not None:
-            if self.__doc__ is None:
-                self.__doc__ = fget.__doc__
-            if self.__name__ is None:
-                self.__name__ = fget.func_name
-
-    def __call__(self, fget):
-        self.fget = fget
-        if self.__doc__ is None:
-            self.__doc__ = fget.__doc__
-        if self.__name__ is None:
-            self.__name__ = fget.func_name
-        return self
-
-    def __get__(self, obj, objtype):
-        if obj is None:
-            return self
-        return self.fget(obj, obj.__dict__["_%s" % self.__name__])
-
-    def __set__(self, obj, value):
-        if self.fset is None:
-            raise AttributeError("can't set attribute")
-        obj.__dict__["_%s" % self.__name__] = self.fset(obj, value)
-
-    def __delete__(self, obj):
-        raise AttributeError("can't delete attribute")
-
-    def setter(self, fset):
-        self.fset = fset
-        return self
-
-
-class ValidatorProxy(object):
-    """Base class for validator proxies.
-
-    This class is monitoring attribute operations (read, write and delete) and
-    forwards client requests to either original validator (read only access;
-    first reads from owner if attribute was changed) or owning object (write
-    and delete access).
-
-    .. note::
-        :class:`ValidatorProxy` will forward only public attributes; if
-        attribute name is prefixed with _ (underscore), all operations will be
-        performed in predefined way.
-
-    :param owner:
-        an object that created validator proxy. It's ``__dict__`` will be used
-        as data placeholder
-    :param validator:
-        original validator object
-    """
-
-    def __init__(self, owner, validator):
-        self._owner = owner
-        self._validator = validator
-
-    def __str__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self._validator)
-
-    def __getattr__(self, name):
-        prop = getattr(self._validator.__class__, name, None)
-        storage = self._get_storage(self._owner, self._validator)
-        if name in storage:
-            if prop is None:
-                return storage[name]
-            else:
-                return prop.fget(self, storage[name])  # Use original getter for same result
-        else:
-            return getattr(self._validator, name)
-
-    def __setattr__(self, name, value):
-        if name in set(['_owner', '_validator']):
-            super(ValidatorProxy, self).__setattr__(name, value)
-        else:
-            prop = getattr(self._validator.__class__, name, None)
-            storage = self._set_storage(self._owner, self._validator)
-            if prop is None:
-                storage[name] = value
-            else:
-                storage[name] = prop.fset(self, value)  # Use original setter for same result
-
-    def __delattr__(self, name):
-        storage = self._get_storage(self._owner, self._validator)
-        if name in storage:
-            del storage[name]
-        else:
-            raise AttributeError("'%s' object has no attribute '%s'" % (self._validator.__class__.__name__, name))
-
-    @classmethod
-    def _set_storage(cls, owner, validator):
-        return owner.__dict__.setdefault("_%s" % validator.key, {})
-
-    @classmethod
-    def _get_storage(cls, owner, validator):
-        return owner.__dict__.get("_%s" % validator.key, {})
-
 
 class Validator(object):
-    """Base class for all validators.
+    """Base class for all validators providing core functionality."""
 
-    :var label:
-        validator's label to be used f.e. as form field label text. Following
-        values are available:
+    __from_string_excs__ = (TypeError, ValueError)
 
-        ``None``
-            use capitalized :attr:`key` as label (default)
-
-        ``Undefined``
-            do not use label at all. Once label is retrieved, its value will be
-            ``Undefined``
-
-        basestring text
-            use provided string as label
-
-    :var default:
-        default value to be used when there is no data bound to validator. This
-        can also be a no-argument callable that returns default value once
-        called
-
-    :var description:
-        validator's description text to be used f.e. as tooltip or for other
-        help purposes
-
-    :var required:
-        setting this to ``True`` makes the validator required; once it has no
-        value assigned, validation will fail
-
-    :var autoconvert:
-        automatically convert provided values to validator-specific type
-        represented by :attr:`python_type`. If this is set to ``False``
-        automatic conversion will not be performed, but type check will be
-        issued instead (default is ``True``)
-
-    :var key:
-        use this to rename validator in owning schema. Useful if validator has
-        same name as one of schema's method or non-validator attributes
-    """
-    __proxy__ = ValidatorProxy
-
-    def __init__(self, label=None, default=Undefined, description=None, required=False, autoconvert=True, key=None):
+    def __init__(self, **kwargs):
         helpers.set_creation_order(self)
-        self.label = label
-        self.default = default
-        self.description = description
-        self.required = required
-        self.autoconvert = autoconvert
-        self.key = key
 
-    def __call__(self, value):
-        return self.process(value, owner=None)
+        # The purpose of this variable is to restore original validator's state
+        # once validator is bound to schema
+        self._bind_kwargs = dict(kwargs)
+
+        # Read only properties
+        self._key = kwargs.pop('key', None)
+        self._schema = None
+        self._raw_value = Undefined
+        self._value = Undefined
+
+        # Read and write properties
+        self.label = kwargs.pop('label', None)
+        self.default = kwargs.pop('default', Undefined)
+        self.description = kwargs.pop('description', None)
+        self.required = kwargs.pop('required', False)
+
+        # Remaining custom read and write properties
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def __setattr__(self, name, value):
+        super(Validator, self).__setattr__(name, value)
+        if not name.startswith('_'):  # Keep track of changed public properties
+            self._bind_kwargs[name] = value
+
+    def is_bound(self):
+        """Check if this validator is bound to schema."""
+        return self._schema is not None
+
+    def bind(self, schema):
+        """Bind validator to given schema.
+
+        This method returns new bound validator based on current one. Original
+        validator (the one for which this method was called) remains unchanged.
+        """
+        if self.is_bound():
+            raise exc.AlreadyBound("%r -> %r" % (self, self.schema))
+        bound = self.__class__(**self._bind_kwargs)
+        bound._key = self._key
+        bound._schema = weakref.ref(schema)
+        schema._bound_validators[self._key] = bound
+        return bound
+
+    def unbind(self):
+        """Unbind this validator from current schema.
+
+        If this validator was not bound to any schema,
+        :exc:`~formify.exc.NotBound` is raised.
+        """
+        if not self.is_bound():
+            raise exc.NotBound(repr(self))
+        del self.schema._bound_validators[self._key]
+        self._schema = None
+
+    def process(self, value):
+        """Process value by running prevalidators, converters and
+        postvalidators.
+
+        This method returns processed value. Also, if validator is bound, it
+        sets up :param:`raw_value` and :param:`value` params.
+        """
+        if self.is_bound():
+            self._raw_value = value
+            self._value = Undefined
+        # Run prevalidators and converters only if value type does not meet
+        # validator's requirements
+        if not self.typecheck(value):
+            value = self.prevalidate(value)
+            if isinstance(value, basestring):
+                value = self.from_string(value)
+            if not self.typecheck(value):
+                raise TypeError("validator %r does not accept values of type %s" % (self, type(value)))
+        value = self.postvalidate(value)
+        if self.is_bound():
+            self._value = value
+        return value
+
+    def prevalidate(self, value):
+        """Prevalidate input value and return value for further processing."""
+        return event.pipeline(self, 'prevalidate', -1, self.schema, self.key, value)
+
+    def postvalidate(self, value):
+        """Postvalidate converted value and return value for use as
+        :param:`value`."""
+        return event.pipeline(self, 'postvalidate', -1, self.schema, self.key, value)
+
+    def from_string(self, value):
+        """Convert string value to object of type represented by
+        :param:`python_type`.
+
+        This method raises :exc:`~formify.exc.ConversionError` if conversion
+        cannot be performed.
+        """
+        try:
+            return self.python_type(value)
+        except (ValueError, TypeError):
+            raise exc.ConversionError("unable to convert '%(value)s' to desired type" % {'value': value})
+
+    def typecheck(self, value):
+        """Check if value type is supported by this validator."""
+        return isinstance(value, self.python_type)
+
+    @property
+    def key(self):
+        """The key assigned to this validator."""
+        return self._key
+
+    @property
+    def schema(self):
+        """Schema object this validator is bound to or ``None`` if this
+        validator is not bound to any schema."""
+        if self._schema is not None:
+            return self._schema()
+
+    @property
+    def raw_value(self):
+        """Unchanged value :meth:`process` was called with.
+
+        If this is ``Undefined``, :meth:`process` was not called yet or was
+        called with ``Undefined`` object value.
+        """
+        return self._raw_value
+
+    @property
+    def value(self):
+        """Output value produced by this validator.
+
+        If this is ``Undefined``, :meth:`process` was not called yet or - if
+        :param:`raw_value` is set - validator was not able to process value.
+        """
+        return self._value
 
     @property
     def python_type(self):
+        """Python type object this validator converts input values to."""
         raise NotImplementedError()
 
-    @validator_property(fset=True)
-    def label(self, value):
-        if value is None:
+    @property
+    def label(self):
+        """Validator's label.
+
+        By default, this is calculated from validator's :param:`key`.
+        """
+        if self._label is None:
             return unicode(self.key.replace('_', ' ').capitalize())
-        elif value is Undefined:
+        elif self._label is Undefined:
             return Undefined
         else:
-            return unicode(value)
+            return unicode(self._label)
 
-    @validator_property(fset=True)
-    def default(self, value):
-        return helpers.maybe_callable(value)
+    @label.setter
+    def label(self, value):
+        self._label = value
 
-    def process(self, value, owner=None):
-        # Create temporary schema with single validator and use it as owner if
-        # no other owner was given
-        if owner is None:
-            owner = schema.Schema()
-            owner.__validators__[self.key] = self
-        self.__proxy__._set_storage(owner, self)['raw_value'] = value
-        value = self.prevalidate(value, owner)
-        if self.autoconvert:
-            value = self.convert(value, owner)
-        elif not self.typecheck(value, owner):
-            raise TypeError("validator %r does not accept values of type %s" % (self, type(value)))
-        value = self.postvalidate(value, owner)
-        storage = self.__proxy__._set_storage(owner, self)
-        storage['value'] = value
-        return value
-
-    def prevalidate(self, value, owner):
-        return event.pipeline(self, 'prevalidate', -1, owner, self.key, value)
-
-    def postvalidate(self, value, owner):
-        return event.pipeline(self, 'postvalidate', -1, owner, self.key, value)
-
-    def convert(self, value, owner):
-        try:
-            return self.python_type(value)
-        except (ValueError, TypeError), e:
-            raise exc.ConversionError(
-                "unable to convert '%(value)s' to %(python_type)s object" %
-                {'value': value, 'python_type': self.python_type})
-
-    def typecheck(self, value, owner):
-        return isinstance(value, self.python_type)
-
-    def param(self, name, owner, default=Undefined):
-        """Get validator's parameter via validator proxy object, so we can be
-        sure the value is always up to date.
-
-        If *owner* is unknown (i.e. set to ``None``) this method just reads the
-        parameter by calling ``getattr`` on current validator object.
-        """
-        if owner is None:
-            return getattr(self, name, default)
+    @property
+    def default(self):
+        """Default value of this validator."""
+        if self._default is Undefined:
+            return Undefined
         else:
-            return getattr(owner[self.key], name, default)
+            return helpers.maybe_callable(self._default)
 
-    ### PRIVATE
-
-    def _get_value(self, owner):
-        storage = self.__proxy__._get_storage(owner, self)
-        value = storage.get('value', Undefined)
-        return value
-
-    def _set_value(self, owner, value):
-        return self.process(value, owner)
+    @default.setter
+    def default(self, value):
+        self._default = value
 
 
 # Import base validators to make it importable via 'formify.validators'
