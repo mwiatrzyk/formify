@@ -4,27 +4,6 @@ import functools
 import threading
 
 
-def synchronized(lock=None):
-    """Makes decorated function thread-safe."""
-
-    if lock is None:
-        lock = threading.Lock()
-
-    def synchronized_proxy(f):
-
-        @functools.wraps(f)
-        def proxy(*args, **kwargs):
-            lock.acquire()
-            try:
-                return f(*args, **kwargs)
-            finally:
-                lock.release()
-
-        return proxy
-
-    return synchronized_proxy
-
-
 class memoized_property(object):
     """A read-only property that is only evaluated once."""
 
