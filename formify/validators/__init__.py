@@ -22,12 +22,13 @@ class Validator(object):
         self._schema = None
         self._raw_value = Undefined
         self._value = Undefined
+        self._errors = []
 
         # Read and write properties
         self.label = kwargs.pop('label', None)
         self.default = kwargs.pop('default', Undefined)
         self.description = kwargs.pop('description', None)
-        self.required = kwargs.pop('required', False)
+        self.required = kwargs.pop('required', True)
 
         # Remaining custom read and write properties
         for k, v in kwargs.items():
@@ -37,6 +38,38 @@ class Validator(object):
         super(Validator, self).__setattr__(name, value)
         if not name.startswith('_'):  # Keep track of changed public properties
             self._bind_kwargs[name] = value
+
+    def _raise_if_unbound(self, func, excs, *args, **kwargs):
+        """Call given function with provided args and kwargs and return its
+        value.
+
+        If exception occurs (one of listed *excs*) do following:
+
+        for unbound validator
+            raise exception
+
+        for bound validator
+            add exception description to list of current validator's errors and
+            return ``Undefined`` object
+
+        :param func:
+            function to be called
+        :param excs:
+            exception or tuple tuple of exceptions to be catched by
+            ``try...except`` block
+        :param *args:
+            function's args
+        :param **kwargs:
+            function's named args
+        """
+        try:
+            return func(*args, **kwargs)
+        except excs, e:
+            if self.is_bound():
+                self.errors.append(unicode(e))
+                return Undefined
+            else:
+                raise
 
     def is_bound(self):
         """Check if this validator is bound to schema."""
@@ -74,20 +107,39 @@ class Validator(object):
         This method returns processed value. Also, if validator is bound, it
         sets up :param:`raw_value` and :param:`value` params.
         """
+
+        # Initialize raw_value, value and error container
         if self.is_bound():
             self._raw_value = value
             self._value = Undefined
-        # Run prevalidators and converters only if value type does not meet
-        # validator's requirements
+            self._errors = []
+
+        # Execute only if value needs conversion
         if not self.typecheck(value):
-            value = self.prevalidate(value)
+
+            # Run prevalidators
+            value = self._raise_if_unbound(self.prevalidate, ValueError, value)
+
+            # Convert to valid type
             if isinstance(value, basestring):
-                value = self.from_string(value)
+                value = self._raise_if_unbound(self.from_string, TypeError, value)
+
+            # If value is Undefined object (f.e. there was processing error) -
+            # return it to avoid TypeError being raised
+            if value is Undefined:
+                return Undefined
+
+            # Raise exception if type is still invalid
             if not self.typecheck(value):
                 raise TypeError("validator %r does not accept values of type %s" % (self, type(value)))
-        value = self.postvalidate(value)
+
+        # Run postvalidators
+        value = self._raise_if_unbound(self.postvalidate, ValueError, value)
+
+        # Set up processed value
         if self.is_bound():
             self._value = value
+
         return value
 
     def prevalidate(self, value):
@@ -114,6 +166,19 @@ class Validator(object):
     def typecheck(self, value):
         """Check if value type is supported by this validator."""
         return isinstance(value, self.python_type)
+
+    def is_valid(self):
+        """Check if last value was processed successfuly."""
+        if not self.is_bound():
+            return True  # always valid if not bound
+        elif self.required and self.value is Undefined:
+            if not self._errors:
+                self._errors.append(u'this field is required')
+            return False
+        elif self.errors:
+            return False
+        else:
+            return True
 
     @property
     def key(self):
@@ -144,6 +209,15 @@ class Validator(object):
         :param:`raw_value` is set - validator was not able to process value.
         """
         return self._value
+
+    @property
+    def errors(self):
+        """List of validation errors.
+
+        Access to this list is public - it can be modified to force validation
+        errors f.e. in custom event listener callables.
+        """
+        return self._errors
 
     @property
     def python_type(self):

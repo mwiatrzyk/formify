@@ -32,7 +32,7 @@ class TestValidator(unittest.TestCase):
         # Given
         test = Validator()
         # When
-        test._schema = object()
+        test._schema = object
         # Then
         self.assertTrue(test.is_bound())
 
@@ -192,3 +192,35 @@ class TestValidator(unittest.TestCase):
         # Then
         self.assertTrue(isinstance(test.label, unicode))
         self.assertEqual(test.label, u'foo bar baz')
+
+    def test_is_valid_unbound(self):
+        # Given / When
+        test = Validator()
+        # Then
+        self.assertTrue(test.is_valid())
+
+    def test_is_valid_false(self):
+        # Given
+        test = Validator()
+        # When
+        test._schema = object
+        test._value = 'a value'
+        test.errors.append('an error')
+        # Then
+        self.assertFalse(test.is_valid())
+
+    def test_prevalidation_error_in_bound_validator(self):
+        # Given
+        class Test(Validator):
+            python_type = unicode
+
+            def prevalidate(self, value):
+                raise ValueError("an error: %s" % value)
+
+        test = Test()
+        test._schema = object
+        # When
+        result = test.process('123')
+        # Then
+        self.assertIs(result, Undefined)
+        self.assertIn('an error: 123', test.errors)

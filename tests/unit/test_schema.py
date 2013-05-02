@@ -279,3 +279,35 @@ class TestSchemaInstance(unittest.TestCase):
         test = self.Test()
         # When / Then
         self.assertFalse(self.Test.a is test['a'])
+
+    def test_errors(self):
+        # Given
+        test = self.Test()
+        test['a'].errors.append('error1')
+        test['b'].errors.append('error2')
+        # When
+        errors = test.errors
+        # Then
+        self.assertIn('error1', errors['a'])
+        self.assertIn('error2', errors['b'])
+        self.assertNotIn('c', errors)
+
+    def test_is_valid_true(self):
+        # Given
+        test = self.Test()
+        # When
+        test.a = 'foo'
+        test.b = 123
+        test.c = True
+        # Then
+        self.assertTrue(test.is_valid())
+
+    def test_is_valid_false(self):
+        # Given
+        test = self.Test()
+        # When
+        status = test.is_valid()
+        # Then
+        self.assertFalse(status)
+        self.assertIn('this field is required', test['b'].errors)
+        self.assertIn('this field is required', test['c'].errors)

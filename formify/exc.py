@@ -17,7 +17,7 @@ class NotBound(BindError):
     schema."""
 
 
-class ValidationError(FormifyError):
+class ValidationError(FormifyError, ValueError):
     """Raised when validation error occurs.
 
     This exception should be used to cover errors occuring after the value had
@@ -25,6 +25,6 @@ class ValidationError(FormifyError):
     """
 
 
-class ConversionError(FormifyError):
+class ConversionError(FormifyError, TypeError):
     """Raised when it is unable to convert string to value of type supported by
     validator."""

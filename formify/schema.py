@@ -87,6 +87,22 @@ class Schema(object):
     def __validators__(self):
         return self.__class__.__validators__
 
+    @property
+    def errors(self):
+        result = {}
+        for k in self:
+            errors = self[k].errors
+            if errors:
+                result[k] = errors
+        return result
+
+    def is_valid(self):
+        result = True
+        for k in self:
+            if not self[k].is_valid():
+                result = False
+        return result
+
     @classmethod
     def add_listener(sender, event, listener):
         event, eargs = event[0], event[1:]
