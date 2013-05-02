@@ -8,8 +8,6 @@ from formify.undefined import Undefined
 class Validator(object):
     """Base class for all validators providing core functionality."""
 
-    __from_string_excs__ = (TypeError, ValueError)
-
     def __init__(self, **kwargs):
         helpers.set_creation_order(self)
 
