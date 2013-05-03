@@ -36,7 +36,7 @@ class TestAddListenerWithOnAddListener(unittest.TestCase):
             counter = 0
 
             @classmethod
-            def add_listener(cls, event, listener):
+            def add_listener(cls, event, listener, default_registrar):
                 if not hasattr(cls, '_my_events'):
                     cls._my_events = {}
                 cls._my_events.setdefault(event, []).append(listener)
@@ -97,7 +97,7 @@ class TestGetListenersWithOnGetListener(unittest.TestCase):
         class Sender(object):
 
             @classmethod
-            def get_listeners(cls, event):
+            def get_listeners(cls, event, default_getter):
                 return [1, 2, 3]
 
         self.Sender = Sender
