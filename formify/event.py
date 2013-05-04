@@ -1,5 +1,19 @@
 """The core of event processing system."""
 
+import weakref
+
+F_READ_ACCESS = 1
+F_WRITE_ACCESS = 2
+
+
+def _get_real_sender(sender, flags):
+    """Helper used to get real sender from given *sender*."""
+    if hasattr(sender, '_event_alias_of'):
+        if sender._event_alias_flags & flags != flags:
+            raise TypeError("sender does not allow requested operation")
+        sender = sender._event_alias_of()
+    return sender
+
 
 def add_listener(sender, event, listener):
     """Register event listener.
@@ -32,6 +46,7 @@ def add_listener(sender, event, listener):
             sender._event_listeners = {}
         sender._event_listeners.setdefault(event, []).append(listener)
 
+    sender = _get_real_sender(sender, F_WRITE_ACCESS)
     registrar = getattr(sender, 'add_listener', None)
     if registrar is not None:
         registrar(event, listener, default_registrar)
@@ -64,11 +79,37 @@ def get_listeners(sender, event):
     def default_getter(sender, event):
         return getattr(sender, '_event_listeners', {}).get(event, [])
 
+    sender = _get_real_sender(sender, F_READ_ACCESS)
     provider = getattr(sender, 'get_listeners', None)
     if provider is not None:
         return provider(event, default_getter)
     else:
         return default_getter(sender, event)
+
+
+def alias_of(sender, real_sender, flags=F_READ_ACCESS|F_WRITE_ACCESS):
+    """Make *sender* an alias of *real_sender*.
+
+    All event operations performed on alias are forwarded to *real_sender*.
+    Currently alias is a weak reference to real sender.
+
+    :param sender:
+        sender that will be an alias
+    :param real_sender:
+        real sender to which requests will be forwarded
+    :param flags:
+        alias access flags. Following options are available:
+
+        ``F_READ_ACCESS``
+            alias supports all operations that does not modify already
+            registered events listeners (f.e. :func:`get_listeners`)
+
+        ``F_WRITE_ACCESS``
+            alias supports all operations that do mofify already registered
+            events and listeners (f.e. :func:`add_listener`)
+    """
+    sender._event_alias_of = weakref.ref(real_sender)
+    sender._event_alias_flags = flags
 
 
 def notify(sender, event, *args, **kwargs):

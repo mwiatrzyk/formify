@@ -109,6 +109,56 @@ class TestGetListenersWithOnGetListener(unittest.TestCase):
         self.assertTrue(listeners == [1, 2, 3])
 
 
+class TestAliasOf(unittest.TestCase):
+
+    def test_make_alias(self):
+        # Given
+        class RealSender(object):
+            pass
+        class Sender(object):
+            pass
+        # When
+        event.alias_of(Sender, RealSender)
+        # Then
+        self.assertTrue(hasattr(Sender, '_event_alias_of'))
+        self.assertTrue(hasattr(Sender, '_event_alias_flags'))
+
+    def test_register_via_alias(self):
+        # Given
+        class RealSender(object):
+            pass
+        class Sender(object):
+            pass
+        def test():
+            pass
+        event.alias_of(Sender, RealSender)
+        # When
+        event.add_listener(Sender, 'test', test)
+        # Then
+        self.assertTrue(hasattr(RealSender, '_event_listeners'))
+        self.assertIn('test', RealSender._event_listeners)
+        self.assertIs(RealSender._event_listeners['test'][0], test)
+
+    def test_read_only_alias(self):
+        # Given
+        class RealSender(object):
+            _event_listeners = {
+                'foo': [1, 2, 3]
+            }
+        class Sender(object):
+            pass
+        def test():
+            pass
+        event.alias_of(Sender, RealSender, event.F_READ_ACCESS)
+        # When
+        def setter():
+            event.add_listener(Sender, 'test', test)
+        result = event.get_listeners(Sender, 'foo')
+        # Then
+        self.assertRaises(TypeError, setter)
+        self.assertEqual(result, [1, 2, 3])
+
+
 class TestNotify(unittest.TestCase):
 
     def setUp(self):
