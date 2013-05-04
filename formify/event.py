@@ -44,7 +44,9 @@ def add_listener(sender, event, listener):
     def default_registrar(sender, event, listener):
         if not hasattr(sender, '_event_listeners'):
             sender._event_listeners = {}
-        sender._event_listeners.setdefault(event, []).append(listener)
+        listeners = sender._event_listeners.setdefault(event, [])
+        if listener not in listeners:
+            listeners.append(listener)
 
     sender = _get_real_sender(sender, F_WRITE_ACCESS)
     registrar = getattr(sender, 'add_listener', None)
