@@ -1,5 +1,6 @@
 import unittest
 
+from formify import event
 from formify.schema import Schema
 from formify.undefined import Undefined
 from formify.validators import Validator
@@ -311,3 +312,54 @@ class TestSchemaInstance(unittest.TestCase):
         self.assertFalse(status)
         self.assertIn('this field is required', test['b'].errors)
         self.assertIn('this field is required', test['c'].errors)
+
+
+class TestEventRegistration(unittest.TestCase):
+    """This test case is used to test overloaded
+    :meth:`~formify.schema.Schema.add_listener` method."""
+
+    def setUp(self):
+        class Test(Schema):
+            a = String()
+            b = Integer()
+            c = Bool()
+        self.Test = Test
+
+    def test_register_schema_event(self):
+        # Given / When
+        @event.listens_for(self.Test, 'test')
+        def test():
+            pass
+        # Then
+        listeners = event.get_listeners(self.Test, 'test')
+        self.assertTrue(listeners)
+        self.assertIs(listeners[0], test)
+
+    def test_register_validator_event_by_validator_key(self):
+        # Given / When
+        @event.listens_for(self.Test, 'test', 'a', 'c')
+        def test():
+            pass
+        # Then
+        self.assertIs(event.get_listeners(self.Test.a, 'test')[0], test)
+        self.assertIs(event.get_listeners(self.Test.c, 'test')[0], test)
+        self.assertFalse(event.get_listeners(self.Test.b, 'test'))
+
+    def test_register_validator_event_by_validator_class(self):
+        # Given / When
+        @event.listens_for(self.Test, 'test', Integer, Bool)
+        def test():
+            pass
+        # Then
+        self.assertFalse(event.get_listeners(self.Test.a, 'test'))
+        self.assertIs(event.get_listeners(self.Test.b, 'test')[0], test)
+        self.assertIs(event.get_listeners(self.Test.c, 'test')[0], test)
+
+    def test_invalid_event_arg(self):
+        # Given / When
+        def test():
+            @event.listens_for(self.Test, 'test', 'a', 'b', Integer, Bool, 1)
+            def test():
+                pass
+        # Then
+        self.assertRaises(TypeError, test)

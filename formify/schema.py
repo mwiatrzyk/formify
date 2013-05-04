@@ -9,7 +9,12 @@ from formify.utils.collections import OrderedDict
 
 
 class SchemaMeta(type):
-    """Metaclass for class :class:`Schema`."""
+    """Metaclass for class :class:`Schema`.
+
+    This metaclass is responsible for collecting all validators that were
+    defined in in schema class, sorting them by creation order and making
+    available for schema via :param:`__validators__` special property.
+    """
 
     @property
     def __validators__(cls):
@@ -26,6 +31,13 @@ class SchemaMeta(type):
 
 
 class Schema(object):
+    """Validation schema class.
+
+    This class is responsible for grouping all validators in one object, making
+    them a single entity. Once schema is instantated, all validators in newly
+    created object are said to be *bound*. You will need to create at least one
+    sublcass of :class:`Schema` when using this library.
+    """
     __metaclass__ = SchemaMeta
 
     def __init__(self, **kwargs):
@@ -104,12 +116,18 @@ class Schema(object):
         return result
 
     @classmethod
-    def add_listener(sender, event, listener):
-        event, eargs = event[0], event[1:]
-        for arg in eargs:
-            if isinstance(arg, type) and issubclass(arg, Validator):
-                for k, v in sender.__validators__.iteritems():
-                    if isinstance(v, arg):
-                        add_listener(v, event, listener)
-            elif isinstance(arg, basestring) and arg in sender.__validators__:
-                add_listener(sender.__validators__[arg], event, listener)
+    def add_listener(sender, event, listener, default_registrar):
+        """Overrides event registration process."""
+        if isinstance(event, basestring):
+            default_registrar(sender, event, listener)
+        else:
+            event, eargs = event[0], event[1:]
+            for arg in eargs:
+                if isinstance(arg, type) and issubclass(arg, Validator):
+                    for k, v in sender.__validators__.iteritems():
+                        if isinstance(v, arg):
+                            add_listener(v, event, listener)
+                elif isinstance(arg, basestring) and arg in sender.__validators__:
+                    add_listener(sender.__validators__[arg], event, listener)
+                else:
+                    raise TypeError("invalid event argument: %r" % arg)
