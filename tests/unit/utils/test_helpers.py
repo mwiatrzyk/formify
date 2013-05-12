@@ -16,3 +16,18 @@ class TestMaybeCallable(unittest.TestCase):
         result = helpers.maybe_callable('test')
         # Then
         self.assertEqual(result, 'test')
+
+
+class TestIsIterable(unittest.TestCase):
+
+    def test_true(self):
+        # When
+        status = helpers.is_iterable([])
+        # Then
+        self.assertTrue(status)
+
+    def test_false(self):
+        # When
+        status = helpers.is_iterable(object())
+        # Then
+        self.assertFalse(status)
