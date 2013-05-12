@@ -436,27 +436,24 @@ class Boolean(Validator):
         ``no``, ``false``
     """
 
-    @property
-    def python_type(self):
-        return bool
-
     def __init__(self, trues=None, falses=None, **kwargs):
         super(Boolean, self).__init__(**kwargs)
         self.trues = trues
         self.falses = falses
 
+    @property
+    def python_type(self):
+        return bool
+
     def from_string(self, value):
-        if not value:  # empty string
+        value = value.lower()
+        trues = set(self.trues or ['1', 'y', 'on', 'yes', 'true'])
+        falses = set(self.falses or ['0', 'n', 'off', 'no', 'false'])
+        if value in trues:
+            return True
+        elif value in falses:
             return False
         else:
-            value = value.lower()
-            trues = set(self.trues or ['1', 'y', 'on', 'yes', 'true'])
-            falses = set(self.falses or ['0', 'n', 'off', 'no', 'false'])
-            if value in trues:
-                return True
-            elif value in falses:
-                return False
-            else:
-                raise exc.ConversionError(
-                    "cannot convert '%(value)s' to boolean" %
-                    {'value': value})
+            raise exc.ConversionError(
+                "cannot convert '%(value)s' to boolean" %
+                {'value': value})

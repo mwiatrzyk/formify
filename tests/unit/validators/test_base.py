@@ -464,12 +464,6 @@ class TestBool(unittest.TestCase):
         # Then
         self.assertFalse(value)
 
-    def test_ok_empty_string(self):
-        # When
-        value = self.validator.process('')
-        # Then
-        self.assertFalse(value)
-
     def test_ok_acceptable(self):
         # When
         value = self.validator.process(False)
@@ -482,6 +476,13 @@ class TestBool(unittest.TestCase):
             self.validator.process('abc')
         # Then
         self.assertRaises(exc.ConversionError, process)
+
+    def test_nok_empty_string(self):
+        # When
+        def processor():
+            self.validator.process('')
+        # Then
+        self.assertRaises(exc.ConversionError, processor)
 
     def test_nok_non_string_input(self):
         # When
