@@ -4,6 +4,7 @@
 class FormifyError(Exception):
     """Common base class for all Formify exceptions."""
 
+
 class BindError(FormifyError):
     pass
 
