@@ -1,5 +1,7 @@
 import weakref
 
+from formify.utils import helpers
+from formify.undefined import Undefined
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import OrderedDict
 
@@ -34,6 +36,11 @@ class Field(object):
     @property
     def id(self):
         """ID that uniquely identifies this field within form."""
+        return self.validator.key
+
+    @property
+    def key(self):
+        """The key of underlying validator."""
         return self.validator.key
 
     @property
@@ -92,24 +99,45 @@ class Field(object):
         raise NotImplementedError("'create_errors_widget' not implemented for %r" % self.__class__)
 
     def process(self, values):
-        """Process given list of values entered by the user.
+        """Process given list of values using underlying validator.
 
-        The list will usually contain only one element. More elements can be
-        found f. e. for choice fields, where the user can pick up one or more
-        option from list of predefined options.
+        The processing takes place as following:
+
+        * if validator is multivalue validator, entire list is forwarded to
+          validator and processed
+        * if validator is not multivalue validator, only last item (i.e. most
+          recent one) is forwarded and processed
 
         :param values:
-            list of values submitted by the user
+            list of values to be processed
         """
-        return self.validator.process(values[-1])
+        if self.validator.multivalue:
+            return self.validator.process(values)
+        else:
+            return self.validator.process(values[-1])
 
 
 class Form(object):
-    __schema__ = None
+    """Connector of schema, validators and fields.
 
-    def __init__(self, data=None, schema=None):
+    :param data:
+        multi dict containing form input data submitted by user
+    :param obj:
+        the object that is being edited by this form. When no *data* is
+        provided this is also used as input data source
+    :param schema:
+        validation schema used to validate data submitted to form
+    """
+    __schema__ = None
+    __undefined_values__ = set()
+
+    def __init__(self, schema=None, data=None, obj=None):
+
+        # Initialize private members
+        self._obj = obj
         self._fields = OrderedDict()
 
+        # Create schema instance
         if schema is not None:
             self._schema = schema()
         elif self.__schema__ is not None:
@@ -117,17 +145,15 @@ class Form(object):
         else:
             raise TypeError("unable to create form without schema")
 
-        for key in self._schema:
-            validator = self._schema[key]
-            visit_method = getattr(self, "visit_%s" % validator.__visit_name__, None)
-            if visit_method is None:
-                visit_method = self.visit_validator
-            self._fields[key] = field = visit_method(validator)  # the field is created here
-            if data is not None and key in data:
-                if hasattr(data, 'getlist'):  # i.e. ImmutableMultiDict from Flask
-                    field.process(data.getlist(key))
-                else:
-                    field.process([data[key]])
+        # Create form field for each validator
+        for validator in self._schema.itervalidators():
+            self._fields[validator.key] = self.create_field(validator)
+
+        # Forward data to underlying schema and process it
+        if data is not None:
+            self._process_data(data)
+        elif obj is not None:
+            self._process_obj(obj)
 
     def __iter__(self):
         for key in self._fields:
@@ -155,32 +181,67 @@ class Form(object):
         else:
             raise KeyError(key)
 
-    @memoized_property
-    def _fields(self):
-        result = OrderedDict()
-        for key in self._schema:
-            validator = self._schema[key]
-            visit_method = getattr(self, "visit_%s" % validator.__visit_name__, None)
-            if visit_method is None:
-                visit_method = self.visit_validator
-            result[key] = field = visit_method(validator)  # the field is created here
-            if key in self._data:
-                field.process(self._data.getlist(key))
-        return result
+    def _process_data(self, data):
+        """Process form data submitted by user."""
 
-    @property
-    def data(self):
-        return self._data
+        # Get multimapping's ``getlist`` method to get list of values for
+        # specified key. If such method does not exist - create dummy one
+        getlist = helpers.get_multimapping_getlist(data)
+        if getlist is None:
+            getlist = lambda k: [data[k]]
+
+        # Forward data to apropriate field to be processed
+        for field in self.iterfields():
+            key = field.key
+            if key in data:
+                values = self.remove_undefined(key, getlist(key))
+                if values:
+                    field.process(values)
 
     @property
     def schema(self):
+        """Validation schema used by form to validate its input."""
         return self._schema
 
-    def visit_validator(self, validator):
-        raise NotImplementedError("%r does not have 'visit_%s' method implemented" % (self.__class__, validator.__visit_name__))
+    @property
+    def obj(self):
+        """Reference of object that is being processed by this form."""
+        return self._obj
+
+    def remove_undefined(self, key, values):
+        """Remove all ``Undefined`` items from *values* for given *key* and
+        return new list of values to be processed by underlying schema.
+
+        This method uses :attr:`__undefined_values__` to guess which values are
+        said to be ``Undefined`` and therefore cannot be processed. You can
+        overload this method in subclass to provide more sophisticated
+        mechanism if needed. This method is executed only if *data* parameter
+        of :meth:`__init__` was set.
+        """
+        if not self.__undefined_values__:
+            return values
+        else:
+            return list(v for v in values if v not in self.__undefined_values__)
+
+    def create_field(self, validator):
+        """Create apropriate field object for given validator.
+
+        This method calls ``visit_[name]`` method that must be implemented in
+        order to create field for *validator*. If such method is not
+        implemented, :exc:`NotImplementedError` is raised. If necessary, this
+        method may be overloaded to provide default field instead of raising
+        exception.
+        """
+        visit_method = getattr(self, "visit_%s" % validator.__visit_name__, None)
+        if visit_method is None:
+            raise NotImplementedError(
+                "there is no 'visit_%s' method implemented in %r - the field "
+                "cannot be created" % (validator.__visit_name__, self.__class__))
+        return visit_method(validator)
 
     def is_valid(self):
-        """Return ``True`` if this form is valid or ``False`` otherwise."""
+        """Return ``True`` if underlying schema is valid or ``False``
+        otherwise."""
         return self._schema.is_valid()
 
     def iterkeys(self):
@@ -196,3 +257,8 @@ class Form(object):
 
     def fields(self):
         return list(self.iterfields())
+
+    def populate(self, obj=None):
+        if obj is None and self.obj is None:
+            raise TypeError("no object to populate with current form state")
+        return self.schema.populate(obj if obj is not None else self.obj)

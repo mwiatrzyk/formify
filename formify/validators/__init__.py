@@ -78,6 +78,30 @@ class Validator(object):
             else:
                 raise
 
+    def _typecheck(self, value):
+        """A helper to perform correct type checking of processed value depending on
+        :attr:`multivalue` state."""
+        if self.multivalue:
+            for v in value:
+                if not self.typecheck(v):
+                    return False
+            return True
+        else:
+            return self.typecheck(value)
+
+    def _from_string(self, value):
+        """A helper to perform correct from string conversion of processed
+        value depending on :attr:`multivalue` state."""
+        if self.multivalue:
+            for i in xrange(len(value)):
+                if isinstance(value[i], basestring):
+                    value[i] = self.from_string(value[i])
+            return value
+        elif isinstance(value, basestring):
+            return self.from_string(value)
+        else:
+            return value
+
     def is_bound(self):
         """Check if this validator is bound to schema."""
         return self._schema is not None
@@ -92,7 +116,13 @@ class Validator(object):
             raise exc.AlreadyBound("%r -> %r" % (self, self.schema))
 
         # Create bound validator instance
-        bound = self.__class__(**self._bind_kwargs)
+        # Use custom defined function to do this if registered as 'bind' event
+        # listener
+        binders = event.get_listeners(self, 'bind')
+        if not binders:
+            bound = self.__class__(**self._bind_kwargs)
+        else:
+            bound = binders[-1](self.schema, self.key, self.__class__, self._bind_kwargs)
 
         # Reset properties that cannot be modified
         bound._key = self._key
@@ -125,6 +155,11 @@ class Validator(object):
         sets up :param:`raw_value` and :param:`value` params.
         """
 
+        # Expect value to be a sequence and convert it to list in case of
+        # multivalue validators
+        if self.multivalue:
+            value = list(value)
+
         # Initialize raw_value, value and error container
         if self.is_bound():
             self._raw_value = value
@@ -132,14 +167,14 @@ class Validator(object):
             self._errors = []
 
         # Execute only if value needs conversion
-        if not self.typecheck(value):
+        if not self._typecheck(value):
 
             # Run prevalidators
             value = self._raise_if_unbound(self.prevalidate, ValueError, value)
 
-            # Convert to valid type
-            if isinstance(value, basestring):
-                value = self._raise_if_unbound(self.from_string, TypeError, value)
+            # Convert to valid type from string
+            if value is not Undefined:
+                value = self._raise_if_unbound(self._from_string, TypeError, value)
 
             # If value is Undefined object (f.e. there was processing error) -
             # return it to avoid TypeError being raised
@@ -147,8 +182,10 @@ class Validator(object):
                 return Undefined
 
             # Raise exception if type is still invalid
-            if not self.typecheck(value):
-                raise TypeError("validator %r does not accept values of type %s" % (self, type(value)))
+            if not self._typecheck(value):
+                raise TypeError(
+                    "validator %r was unable to convert %r to valid type" %
+                    (self, value if self.multivalue else value[0]))
 
         # Run postvalidators
         value = self._raise_if_unbound(self.postvalidate, ValueError, value)
@@ -189,6 +226,14 @@ class Validator(object):
         """
         return event.pipeline(self, 'postvalidate', -1, self.schema, self.key, value)
 
+    def validate(self, value):
+        """Validate processed value.
+
+        This validation process is issued once :meth:`is_valid` is called for
+        this validator.
+        """
+        return event.pipeline(self, 'validate', -1, self.schema, self.key, value)
+
     def from_string(self, value):
         """Convert string value to :param:`python_type` type object.
 
@@ -201,21 +246,20 @@ class Validator(object):
             raise exc.ConversionError("unable to convert '%(value)s' to desired type" % {'value': value})
 
     def typecheck(self, value):
-        """Check if value type is supported by this validator."""
+        """Check if type of *value* is supported by this validator."""
         return isinstance(value, self.python_type)
 
     def is_valid(self):
         """Check if last value was processed successfuly."""
         if not self.is_bound():
             return True  # always valid if not bound
-        elif self.required and self.value is Undefined:
-            if not self._errors:
-                self._errors.append(u'this field is required')
-            return False
         elif self.errors:
+            return False  # if validator already has errors, return false and skip further validation
+        elif self.required and self.value is Undefined:
+            self._errors.append(u'this field is required')
             return False
-        else:
-            return True
+        self._value = self._raise_if_unbound(self.validate, ValueError, self._value)
+        return len(self.errors) == 0
 
     @property
     def key(self):
@@ -268,6 +312,12 @@ class Validator(object):
     def python_type(self):
         """Python type object this validator converts input values to."""
         raise NotImplementedError("'python_type' is not implemented in %r" % self.__class__)
+
+    @property
+    def multivalue(self):
+        """``True`` if validator is a multivalue validator (i.e. it accepts and
+        validates sequence of values of same type) or ``False`` otherwise."""
+        return False
 
     @property
     def label(self):
@@ -541,16 +591,26 @@ class Boolean(Validator):
 class Choice(Validator):
     __visit_name__ = 'choice'
 
-    def __init__(self, options, to_string=str, from_string=str, multiple=False, **kwargs):
-        super(Choice, self).__init__(**kwargs)
-        self.to_string = to_string
-        self.from_string = from_string
-        self.multiple = multiple
+    def __init__(self, options, python_type=str, multivalue=False, **kwargs):
+        super(Choice, self).__init__(
+            python_type=python_type, multivalue=multivalue, **kwargs)
         self.options = options
 
     @property
     def python_type(self):
-        return set
+        return self._python_type
+
+    @python_type.setter
+    def python_type(self, value):
+        self._python_type = value
+
+    @property
+    def multivalue(self):
+        return self._multivalue
+
+    @multivalue.setter
+    def multivalue(self, value):
+        self._multivalue = value
 
     @property
     def options(self):
@@ -558,29 +618,25 @@ class Choice(Validator):
 
     @options.setter
     def options(self, value):
-        if helpers.is_mapping(value):
-            value = sorted((self.to_string(k), v) for k, v in value.iteritems())
+        if hasattr(value, 'items'):
+            value = sorted((k, v) for k, v in value.items())
         self._options = OrderedDict(value)
-
-    def prevalidate(self, value):
-        value = super(Choice, self).prevalidate(value)
-        value = self.python_type([self.to_string(v) for v in value])
-        return value
 
     def postvalidate(self, value):
         value = super(Choice, self).postvalidate(value)
-        if set(self.options.iterkeys()).intersection(value) != value:
-            raise exc.ValidationError("invalid choice")
-        value = self.python_type([self.from_string(v) for v in value])
-        if self.multiple:
-            return value
+        if self.multivalue:
+            for v in value:
+                if v not in self.options:
+                    raise exc.ValidationError("invalid choice")
         else:
-            return value.pop()
+            if value not in self.options:
+                raise exc.ValidationError("invalid choice")
+        return value
 
     def is_selected(self, value):
         if self.value is Undefined:
             return False
-        elif self.multiple:
+        elif self.multivalue:
             return self.from_string(value) in self.value
         else:
             return self.from_string(value) == self.value

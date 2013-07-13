@@ -91,6 +91,7 @@ class Tag(object):
             the ID for this tag
         """
         self.attr['id'] = id_
+        return self
 
     def add_class(self, *args):
         """Add CSS class or classes for this tag.
@@ -107,6 +108,7 @@ class Tag(object):
                 self.attr['class'] = set([self.attr['class'], cls])
             else:
                 self.attr['class'].add(cls)
+        return self
 
 
 class Field(forms.Field):
@@ -118,11 +120,22 @@ class Field(forms.Field):
     def create_label_widget(self):
         if self.validator.label is Undefined:
             return None
-        widget = Tag('label', self.validator.label)
+        # Label text
+        label_text = Tag('span', self.validator.label)
+        label_text.add_class('ffy-label-text')
+        # Label widget
+        widget = Tag('label')
+        widget.attr['for'] = self.id
         widget.add_class('ffy-label')
         if self.validator.required:
             widget.add_class('ffy-label-required')
-        widget.attr['for'] = self.id
+            # Create marker for required fields
+            label_marker = Tag('span', '*')
+            label_marker.add_class('ffy-label-marker')
+            # Join text and marker together producing complete label
+            widget.data = [label_text, label_marker]
+        else:
+            widget.data = label_text
         return widget
 
     def create_description_widget(self):
@@ -139,12 +152,6 @@ class Field(forms.Field):
         widget.add_class('ffy-errors')
         widget.data = [Tag('li', e) for e in self.validator.errors]
         return widget
-
-    def process(self, values):
-        if len(values) == 1 and not values[0]:
-            return Undefined
-        else:
-            return super(Field, self).process(values)
 
     @property
     def widget(self):
@@ -238,9 +245,6 @@ class ChoiceField(Field):
             options.append(option)
         return self.create_container_widget(options)
 
-    def process(self, values):
-        return self.validator.process(values)
-
 
 class RadioCheckboxChoiceField(ChoiceField):
 
@@ -287,13 +291,14 @@ class CheckboxField(InputField):
 class TextAreaField(Field):
 
     def create_widget(self):
-        widget = Tag('textarea', self.validator.raw_value)
+        widget = Tag('textarea', self.validator.raw_value or u'')
         widget.attr['name'] = self.validator.key
         widget.add_class("ffy-field-validator-%s" % self.validator.name)
         return widget
 
 
 class Form(forms.Form):
+    __undefined_values__ = set([''])
 
     def visit_basestring(self, validator):
         return TextField(self, validator)
@@ -311,12 +316,12 @@ class Form(forms.Form):
         return CheckboxField(self, validator)
 
     def visit_choice(self, validator):
-        return ChoiceField(self, validator, validator.multiple)
+        return ChoiceField(self, validator, validator.multivalue)
 
     def visit_numeric(self, validator):
         return TextField(self, validator)
 
-    def as_table(self):
+    def as_table(self, **kwargs):
         rows = []
         for field in self.iterfields():
             row = Tag('tr', [
@@ -324,4 +329,4 @@ class Form(forms.Form):
                 Tag('td', [field.widget, field.errors_widget]),
             ])
             rows.append(row)
-        return Markup(''.join(unicode(r) for r in rows))
+        return Tag('table', rows, attr=kwargs)

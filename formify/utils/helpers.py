@@ -44,3 +44,16 @@ def is_mapping(value):
     method.
     """
     return is_sequence(value) and hasattr(value, 'keys')
+
+def get_multimapping_getlist(value):
+    """Retrieve ``getlist`` method (used to get all values for given key) if
+    *value* is a multi-dictionary object.
+
+    If *value* is not multi-dictionary or, ``None`` is returned.
+    """
+    if not is_mapping(value):
+        return None
+    if hasattr(value, 'getlist'):  # i.e. ImmutableMultiDict from Flask
+        return value.getlist
+    else:
+        return None
