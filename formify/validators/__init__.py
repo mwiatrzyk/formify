@@ -185,7 +185,7 @@ class Validator(object):
             if not self._typecheck(value):
                 raise TypeError(
                     "validator %r was unable to convert %r to valid type" %
-                    (self, value if self.multivalue else value[0]))
+                    (self, value))
 
         # Run postvalidators
         value = self._raise_if_unbound(self.postvalidate, ValueError, value)
@@ -623,7 +623,6 @@ class Choice(Validator):
         self._options = OrderedDict(value)
 
     def postvalidate(self, value):
-        value = super(Choice, self).postvalidate(value)
         if self.multivalue:
             for v in value:
                 if v not in self.options:
@@ -631,7 +630,7 @@ class Choice(Validator):
         else:
             if value not in self.options:
                 raise exc.ValidationError("invalid choice")
-        return value
+        return super(Choice, self).postvalidate(value)
 
     def is_selected(self, value):
         if self.value is Undefined:

@@ -1,110 +1,13 @@
 import copy
+import itertools
 import collections
 
-from formify.utils import helpers
 from formify.event import add_listener
+from formify.objproxy import create_proxy
 from formify.undefined import Undefined
 from formify.validators import Validator
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import AttrDict, OrderedDict
-
-
-class Proxy(object):
-    """Base object proxy class.
-
-    Subclasses of this class are used by :meth:`Schema.populate` to populate
-    different kind of objects using same interface by providing proxy to
-    original object. When implementing concrete subclass following special
-    methods have to be defined:
-
-    ``__contains__(key)``
-        to check if wrapped object contains attribute *key*
-
-    ``__setitem__(key, value)``
-        to overwrite attribute *key* of wrapped object and set it to new
-        *value*
-
-    ``__delitem__(key)``
-        to delete or clear attribute *key* of wrapped object
-    """
-
-    def __init__(self, obj):
-        self._obj = obj
-        self._modified = False
-
-    def __contains__(self, key):
-        return self.contains(key)
-
-    def __getitem__(self, key):
-        return self.getitem(key)
-
-    def __setitem__(self, key, value):
-        self.setitem(key, value)
-        self._modified = True
-
-    def __delitem__(self, key):
-        self.delitem(key)
-        self._modified = True
-
-    def contains(self, key):
-        raise NotImplementedError()
-
-    def getitem(self, key):
-        raise NotImplementedError()
-
-    def setitem(self, key, value):
-        raise NotImplementedError()
-
-    def delitem(self, key):
-        raise NotImplementedError()
-
-    def neq(self, key, value):
-        """Return ``True`` if :attr:`obj` *key* value is different than *value*
-        or ``False`` otherwise."""
-        return self[key] != value
-
-    @property
-    def obj(self):
-        """Object wrapped by this proxy."""
-        return self._obj
-
-    @property
-    def modified(self):
-        """Return ``True`` if underlying object was modified or ``False``
-        otherwise."""
-        return self._modified
-
-
-class ObjectProxy(Proxy):
-    """Proxy used for standard objects."""
-
-    def contains(self, key):
-        return hasattr(self.obj, key)
-
-    def getitem(self, key):
-        return getattr(self.obj, key)
-
-    def setitem(self, key, value):
-        setattr(self.obj, key, value)
-
-    def delitem(self, key):
-        delattr(self.obj, key)
-
-
-class MappingProxy(Proxy):
-    """Proxy used for mapping objects."""
-
-    def contains(self, key):
-        return key in self.obj
-
-    def getitem(self, key):
-        return self.obj[key]
-
-    def setitem(self, key, value):
-        self.obj[key] = value
-
-    def delitem(self, key):
-        del self.obj[key]
 
 
 class SchemaMeta(type):
@@ -290,7 +193,7 @@ class Schema(object):
         """Return list of validator objects registered for this schema."""
         return list(self.itervalidators())
 
-    def populate(self, obj, proxy_cls=None):
+    def populate(self, obj, extra=None, proxy_cls=create_proxy):
         """Update given object with current state of this form.
 
         This method returns ``True`` if one or more attributes of *obj* were
@@ -303,17 +206,14 @@ class Schema(object):
             optional proxy to be used when accessing *obj* (if not given,
             default one will be used according to *obj* type)
         """
+        if extra is None:
+            extra = {}
 
         # Wrap object with proxy
-        if proxy_cls is not None:
-            obj = proxy_cls(obj)
-        elif helpers.is_mapping(obj):
-            obj = MappingProxy(obj)
-        else:
-            obj = ObjectProxy(obj)
+        obj = proxy_cls(obj)
 
         # Populate object
-        for key, value in self.iteritems():
+        for key, value in itertools.chain(self.iteritems(), extra.iteritems()):
             if key not in obj:
                 if value is not Undefined:
                     obj[key] = value
@@ -322,11 +222,11 @@ class Schema(object):
             elif obj.neq(key, value):
                 obj[key] = value
 
-        # Return populated object if it was modified or None otherwise
+        # Return True if object was modified or False otherwise
         if obj.modified:
-            return obj.obj
+            return True
         else:
-            return None
+            return False
 
     @classmethod
     def add_listener(sender, event, listener, default_registrar):

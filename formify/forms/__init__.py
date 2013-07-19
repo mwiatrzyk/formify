@@ -1,6 +1,7 @@
 import weakref
 
 from formify.utils import helpers
+from formify.objproxy import create_proxy
 from formify.undefined import Undefined
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import OrderedDict
@@ -120,22 +121,26 @@ class Field(object):
 class Form(object):
     """Connector of schema, validators and fields.
 
+    :param schema:
+        validation schema used to validate data submitted to form
     :param data:
-        multi dict containing form input data submitted by user
+        mapping containing form input data submitted by user
     :param obj:
         the object that is being edited by this form. When no *data* is
         provided this is also used as input data source
-    :param schema:
-        validation schema used to validate data submitted to form
+    :param proxy_cls:
+        proxy class used to wrap *obj* and customize attribute read operations.
+        If not given default one will be determined by *obj* type
     """
     __schema__ = None
     __undefined_values__ = set()
 
-    def __init__(self, schema=None, data=None, obj=None):
+    def __init__(self, schema=None, data=None, obj=None, proxy_cls=create_proxy):
 
         # Initialize private members
         self._obj = obj
         self._fields = OrderedDict()
+        self._proxy_cls = proxy_cls
 
         # Create schema instance
         if schema is not None:
@@ -198,10 +203,31 @@ class Form(object):
                 if values:
                     field.process(values)
 
+    def _process_obj(self, obj):
+        """Process form using data from given object."""
+
+        # Wrap object with proxy
+        obj = self._proxy_cls(obj)
+
+        # Iterate through each field and check if object has corresponding key
+        # If so, use it as data source for the field
+        for field in self.iterfields():
+            key = field.key
+            if key in obj:
+                field.process([obj[key]])
+
     @property
     def schema(self):
         """Validation schema used by form to validate its input."""
         return self._schema
+
+    @property
+    def info(self):
+        """Placeholder for custom data.
+
+        This is a shortcut for :attr:`Schema.info` of underlying schema object.
+        """
+        return self.schema.info
 
     @property
     def obj(self):
@@ -261,4 +287,6 @@ class Form(object):
     def populate(self, obj=None):
         if obj is None and self.obj is None:
             raise TypeError("no object to populate with current form state")
-        return self.schema.populate(obj if obj is not None else self.obj)
+        return self.schema.populate(
+            obj if obj is not None else self.obj,
+            proxy_cls=self._proxy_cls)
