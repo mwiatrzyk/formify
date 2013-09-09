@@ -303,11 +303,8 @@ class Form(forms.Form):
     def visit_basestring(self, validator):
         return TextField(self, validator)
 
-    def visit_string(self, validator):
-        if validator.multiline:
-            return TextAreaField(self, validator)
-        else:
-            return self.visit_basestring(validator)
+    def visit_text(self, validator):
+        return TextAreaField(self, validator)
 
     def visit_password(self, validator):
         return PasswordField(self, validator)

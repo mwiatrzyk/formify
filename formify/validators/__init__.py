@@ -369,13 +369,11 @@ class String(BaseString):
         if ``True``, multiline input field will be used when rendering this
         validator
     """
-    __visit_name__ = 'string'
 
-    def __init__(self, length_max=None, length_min=None, multiline=False, **kwargs):
+    def __init__(self, length_max=None, length_min=None, **kwargs):
         super(String, self).__init__(**kwargs)
         self.length_max = length_max
         self.length_min = length_min
-        self.multiline = multiline
 
     def postvalidate(self, value):
         value = super(String, self).postvalidate(value)
@@ -399,6 +397,11 @@ class String(BaseString):
                 "number of characters must not be greater than %(length_max)s"
                 % params)
         return value
+
+
+class Text(String):
+    """Multiline version of :class:`String` validator."""
+    __visit_name__ = 'text'
 
 
 class Password(BaseString):
