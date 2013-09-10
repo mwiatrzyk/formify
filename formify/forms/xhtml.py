@@ -297,6 +297,17 @@ class TextAreaField(Field):
         return widget
 
 
+class SchemaField(Field):
+
+    def create_widget(self):
+        for validator in self.validator.itervalidators():
+            yield self.form.create_field(validator)
+
+    @property
+    def widget(self):
+        return list(self.create_widget())
+
+
 class Form(forms.Form):
     __undefined_values__ = set([''])
 
@@ -317,6 +328,9 @@ class Form(forms.Form):
 
     def visit_numeric(self, validator):
         return TextField(self, validator)
+
+    def visit_schema(self, validator):
+        return SchemaField(self, validator)
 
     def as_table(self, **kwargs):
         rows = []

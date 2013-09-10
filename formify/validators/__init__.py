@@ -1,16 +1,8 @@
-import re
-import decimal
 import weakref
-import hashlib
 
 from formify import exc, event
 from formify.utils import helpers
 from formify.undefined import Undefined
-from formify.utils.collections import OrderedDict
-
-__all__ = [
-    'Validator', 'BaseString', 'String', 'Regex', 'Numeric', 'Integer',
-    'Float', 'Decimal', 'Boolean', 'Choice']
 
 
 class Validator(object):
@@ -26,7 +18,7 @@ class Validator(object):
 
         # Read only properties
         self._key = kwargs.pop('key', None)
-        self._schema = None
+        self._owner = None
         self._raw_value = Undefined
         self._value = Undefined
         self._errors = []
@@ -104,7 +96,7 @@ class Validator(object):
 
     def is_bound(self):
         """Check if this validator is bound to schema."""
-        return self._schema is not None
+        return self._owner is not None
 
     def bind(self, schema):
         """Bind validator to given schema.
@@ -113,7 +105,7 @@ class Validator(object):
         validator (the one for which this method was called) remains unchanged.
         """
         if self.is_bound():
-            raise exc.AlreadyBound("%r -> %r" % (self, self.schema))
+            raise exc.AlreadyBound("%r -> %r" % (self, self.owner))
 
         # Create bound validator instance
         # Use custom defined function to do this if registered as 'bind' event
@@ -122,11 +114,11 @@ class Validator(object):
         if not binders:
             bound = self.__class__(**self._bind_kwargs)
         else:
-            bound = binders[-1](self.schema, self.key, self.__class__, self._bind_kwargs)
+            bound = binders[-1](self.owner, self.key, self.__class__, self._bind_kwargs)
 
         # Reset properties that cannot be modified
         bound._key = self._key
-        bound._schema = weakref.ref(schema)
+        bound._owner = weakref.ref(schema)
 
         # Forward all event retrieval requests to validator originally created
         # as schema attribute
@@ -144,8 +136,8 @@ class Validator(object):
         """
         if not self.is_bound():
             raise exc.NotBound(repr(self))
-        del self.schema._bound_validators[self._key]
-        self._schema = None
+        del self.owner._bound_validators[self._key]
+        self._owner = None
 
     def process(self, value):
         """Process value by running prevalidators, converters and
@@ -213,7 +205,7 @@ class Validator(object):
 
         :rtype: :class:`basestring` or :meth:`python_type`
         """
-        return event.pipeline(self, 'prevalidate', -1, self.schema, self.key, value)
+        return event.pipeline(self, 'prevalidate', -1, self.owner, self.key, value)
 
     def postvalidate(self, value):
         """Process converted value.
@@ -224,7 +216,7 @@ class Validator(object):
         :param value:
             the value to be postvalidated
         """
-        return event.pipeline(self, 'postvalidate', -1, self.schema, self.key, value)
+        return event.pipeline(self, 'postvalidate', -1, self.owner, self.key, value)
 
     def validate(self, value):
         """Validate processed value.
@@ -232,7 +224,7 @@ class Validator(object):
         This validation process is issued once :meth:`is_valid` is called for
         this validator.
         """
-        return event.pipeline(self, 'validate', -1, self.schema, self.key, value)
+        return event.pipeline(self, 'validate', -1, self.owner, self.key, value)
 
     def from_string(self, value):
         """Convert string value to :param:`python_type` type object.
@@ -275,11 +267,13 @@ class Validator(object):
         return self.__class__.__name__
 
     @property
-    def schema(self):
+    def owner(self):
         """Schema object this validator is bound to or ``None`` if this
         validator is not bound to any schema."""
-        if self._schema is not None:
-            return self._schema()
+        if self._owner is not None:
+            return self._owner()
+        else:
+            return None
 
     @property
     def raw_value(self):
@@ -349,296 +343,7 @@ class Validator(object):
         self._default = value
 
 
-class BaseString(Validator):
-    """Generic string input validator."""
-    __visit_name__ = 'basestring'
-
-    @property
-    def python_type(self):
-        return unicode
-
-
-class String(BaseString):
-    """String input validator.
-
-    :param length_max:
-        maximal string length
-    :param length_min:
-        minimal string length
-    :param multiline:
-        if ``True``, multiline input field will be used when rendering this
-        validator
-    """
-
-    def __init__(self, length_max=None, length_min=None, **kwargs):
-        super(String, self).__init__(**kwargs)
-        self.length_max = length_max
-        self.length_min = length_min
-
-    def postvalidate(self, value):
-        value = super(String, self).postvalidate(value)
-        params = {
-            'length_min': self.length_min,
-            'length_max': self.length_max}
-        if self.length_min is not None and\
-           self.length_max is not None and\
-           not (self.length_min <= len(value) <= self.length_max):
-            raise exc.ValidationError(
-                "number of characters must be between %(length_min)s and "
-                "%(length_max)s" % params)
-        elif self.length_min is not None and\
-             len(value) < self.length_min:
-            raise exc.ValidationError(
-                "number of characters must not be less than %(length_min)s" %
-                params)
-        elif self.length_max is not None and\
-             len(value) > self.length_max:
-            raise exc.ValidationError(
-                "number of characters must not be greater than %(length_max)s"
-                % params)
-        return value
-
-
-class Text(String):
-    """Multiline version of :class:`String` validator."""
-    __visit_name__ = 'text'
-
-
-class Password(BaseString):
-    """Password input validator.
-
-    :param hashfunc:
-        hash function to be used to encode password. Following values are
-        supported:
-
-        string name
-            specify algorithm name within :mod:`hashlib` module
-
-        callable
-            single-argument callable taking raw password and returning hashed
-            password
-
-        ``None``
-            use raw passwords
-        """
-    __visit_name__ = 'password'
-
-    def __init__(self, hashfunc='sha1', **kwargs):
-        super(Password, self).__init__(**kwargs)
-        self.hashfunc = hashfunc
-
-    def postvalidate(self, value):
-        value = super(Password, self).postvalidate(value)
-        if self.hashfunc is None:
-            return value
-        elif callable(self.hashfunc):
-            value = self.hashfunc(value)
-        else:
-            hashfunc = getattr(hashlib, self.hashfunc, None)
-            if hashfunc is not None:
-                value = hashfunc(value).hexdigest()
-            else:
-                raise ValueError("unknown hash function %r" % self.hashfunc)
-        return value
-
-
-class Regex(BaseString):
-    """Validate input with given regular expression.
-
-    :param pattern:
-        regular expression pattern
-    :param flags:
-        regular expression flags (see :mod:`re` for details)
-    """
-
-    def __init__(self, pattern, flags=0, **kwargs):
-        super(Regex, self).__init__(**kwargs)
-        self.pattern = pattern
-        self.flags = flags
-
-    def postvalidate(self, value):
-        value = super(Regex, self).postvalidate(value)
-        params = {
-            'value': value,
-            'pattern': self.pattern}
-        if not re.match(self.pattern, value, self.flags):
-            raise exc.ValidationError(
-                "value '%(value)s' does not match pattern '%(pattern)s'" %
-                params)
-        return value
-
-
-class Numeric(Validator):
-    """Generic numeric input validator.
-
-    :param value_min:
-        minimal allowed input value
-    :param value_max:
-        maximal allowed input value
-    """
-    __visit_name__ = 'numeric'
-
-    def __init__(self, value_min=None, value_max=None, **kwargs):
-        super(Numeric, self).__init__(**kwargs)
-        self.value_min = value_min
-        self.value_max = value_max
-
-    def postvalidate(self, value):
-        value = super(Numeric, self).postvalidate(value)
-        params = {
-            'value_min': self.value_min,
-            'value_max': self.value_max}
-        if self.value_min is not None and\
-           self.value_max is not None and\
-           not (self.value_min <= value <= self.value_max):
-            raise exc.ValidationError(
-                "value must be between %(value_min)s and %(value_max)s" %
-                params)
-        elif self.value_min is not None and\
-             value < self.value_min:
-            raise exc.ValidationError(
-                "value must not be less than %(value_min)s" % params)
-        elif self.value_max is not None and\
-             value > self.value_max:
-            raise exc.ValidationError(
-                "value must not be greater than %(value_max)s" % params)
-        return value
-
-
-class Integer(Numeric):
-    """Integer number input validator."""
-
-    @property
-    def python_type(self):
-        return int
-
-    def from_string(self, value):
-        try:
-            return self.python_type(value)
-        except ValueError:
-            raise exc.ConversionError(
-                "unable to convert '%(value)s' to integer number" %
-                {'value': value})
-
-
-class Float(Numeric):
-    """Floating point number input validator."""
-
-    @property
-    def python_type(self):
-        return float
-
-    def from_string(self, value):
-        try:
-            return self.python_type(value)
-        except ValueError:
-            raise exc.ConversionError(
-                "unable to convert '%(value)s' to floating point (a.k.a. real) "
-                "number" % {'value': value})
-
-
-class Decimal(Numeric):
-    """Decimal number input validator."""
-
-    @property
-    def python_type(self):
-        return decimal.Decimal
-
-    def from_string(self, value):
-        try:
-            return self.python_type(value)
-        except decimal.InvalidOperation:
-            raise exc.ConversionError(
-                "unable to convert '%(value)s' to decimal number" %
-                {'value': value})
-
-
-class Boolean(Validator):
-    """Boolean value input validator.
-
-    :param trues:
-        sequence of phrases that evaluate to ``True``. Default case-insensitive
-        true-evaluating phrases are: ``1``, ``y``, ``on``, ``yes``, ``true``
-    :param falses:
-        sequence of phrases that evaluate to ``False``. Default
-        case-insensitive false-evaluating phrases are: ``0``, ``n``, ``off``,
-        ``no``, ``false``
-    """
-    __visit_name__ = 'boolean'
-
-    def __init__(self, trues=None, falses=None, **kwargs):
-        if 'default' not in kwargs:
-            kwargs['default'] = False  # make it False by default to avoid 'required missing' errors
-        super(Boolean, self).__init__(**kwargs)
-        self.trues = trues
-        self.falses = falses
-
-    @property
-    def python_type(self):
-        return bool
-
-    def from_string(self, value):
-        value = value.lower()
-        trues = set(self.trues or ['1', 'y', 'on', 'yes', 'true'])
-        falses = set(self.falses or ['0', 'n', 'off', 'no', 'false'])
-        if value in trues:
-            return True
-        elif value in falses:
-            return False
-        else:
-            raise exc.ConversionError(
-                "cannot convert '%(value)s' to boolean" %
-                {'value': value})
-
-
-class Choice(Validator):
-    __visit_name__ = 'choice'
-
-    def __init__(self, options, python_type=str, multivalue=False, **kwargs):
-        super(Choice, self).__init__(
-            python_type=python_type, multivalue=multivalue, **kwargs)
-        self.options = options
-
-    @property
-    def python_type(self):
-        return self._python_type
-
-    @python_type.setter
-    def python_type(self, value):
-        self._python_type = value
-
-    @property
-    def multivalue(self):
-        return self._multivalue
-
-    @multivalue.setter
-    def multivalue(self, value):
-        self._multivalue = value
-
-    @property
-    def options(self):
-        return self._options
-
-    @options.setter
-    def options(self, value):
-        if hasattr(value, 'items'):
-            value = sorted((k, v) for k, v in value.items())
-        self._options = OrderedDict(value)
-
-    def postvalidate(self, value):
-        if self.multivalue:
-            for v in value:
-                if v not in self.options:
-                    raise exc.ValidationError("invalid choice")
-        else:
-            if value not in self.options:
-                raise exc.ValidationError("invalid choice")
-        return super(Choice, self).postvalidate(value)
-
-    def is_selected(self, value):
-        if self.value is Undefined:
-            return False
-        elif self.multivalue:
-            return self.from_string(value) in self.value
-        else:
-            return self.from_string(value) == self.value
+# Import most commonly used validators
+from formify.validators.core import (
+    Group, BaseString, String, Text, Regex, Numeric, Integer, Float, Decimal,
+    Boolean, Choice)
