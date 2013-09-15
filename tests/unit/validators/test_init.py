@@ -2,6 +2,7 @@ import random
 import unittest
 
 from formify import exc
+from formify.schema import Schema
 from formify.undefined import Undefined
 from formify.validators import Validator
 
@@ -38,12 +39,9 @@ class TestValidator(unittest.TestCase):
 
     def test_bind(self):
         # Given
-        class Schema(object):
-            _bound_validators = {}
         schema = Schema()
         test = Validator(foo='foo', key='test')
         test.bar = 123
-        test.default = True
         # When
         bound = test.bind(schema)
         # Then
@@ -53,12 +51,9 @@ class TestValidator(unittest.TestCase):
         self.assertEqual(bound.key, 'test')
         self.assertEqual(bound.foo, 'foo')
         self.assertEqual(bound.bar, 123)
-        self.assertEqual(bound.default, True)
 
     def test_bind_twice(self):
         # Given
-        class Schema(object):
-            _bound_validators = {}
         schema = Schema()
         test = Validator(key='test')
         # When
@@ -69,8 +64,6 @@ class TestValidator(unittest.TestCase):
 
     def test_unbind(self):
         # Given
-        class Schema(object):
-            _bound_validators = {}
         schema = Schema()
         test = Validator(key='test')
         # When

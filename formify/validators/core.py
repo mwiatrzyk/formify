@@ -5,19 +5,8 @@ import hashlib
 from formify import exc
 from formify.undefined import Undefined
 from formify.validators import Validator
+from formify.utils.decorators import memoized_property
 from formify.utils.collections import OrderedDict
-
-
-class Group(Validator):
-    __visit_name__ = 'schema'
-
-    def __init__(self, schema_cls=None, **kwargs):
-        super(Group, self).__init__(**kwargs)
-        self.schema_cls = schema_cls
-
-    def itervalidators(self):
-        for value in self.cls.__validators__.itervalues():
-            yield value
 
 
 class BaseString(Validator):
@@ -42,9 +31,8 @@ class String(BaseString):
     """
 
     def __init__(self, length_max=None, length_min=None, **kwargs):
-        super(String, self).__init__(**kwargs)
-        self.length_max = length_max
-        self.length_min = length_min
+        super(String, self).__init__(
+            length_max=length_max, length_min=length_min, **kwargs)
 
     def postvalidate(self, value):
         value = super(String, self).postvalidate(value)
@@ -95,8 +83,7 @@ class Password(BaseString):
     __visit_name__ = 'password'
 
     def __init__(self, hashfunc='sha1', **kwargs):
-        super(Password, self).__init__(**kwargs)
-        self.hashfunc = hashfunc
+        super(Password, self).__init__(hashfunc=hashfunc, **kwargs)
 
     def postvalidate(self, value):
         value = super(Password, self).postvalidate(value)
@@ -123,9 +110,7 @@ class Regex(BaseString):
     """
 
     def __init__(self, pattern, flags=0, **kwargs):
-        super(Regex, self).__init__(**kwargs)
-        self.pattern = pattern
-        self.flags = flags
+        super(Regex, self).__init__(pattern=pattern, flags=flags, **kwargs)
 
     def postvalidate(self, value):
         value = super(Regex, self).postvalidate(value)
@@ -150,9 +135,7 @@ class Numeric(Validator):
     __visit_name__ = 'numeric'
 
     def __init__(self, value_min=None, value_max=None, **kwargs):
-        super(Numeric, self).__init__(**kwargs)
-        self.value_min = value_min
-        self.value_max = value_max
+        super(Numeric, self).__init__(value_min=value_min, value_max=value_max, **kwargs)
 
     def postvalidate(self, value):
         value = super(Numeric, self).postvalidate(value)
@@ -240,9 +223,7 @@ class Boolean(Validator):
     def __init__(self, trues=None, falses=None, **kwargs):
         if 'default' not in kwargs:
             kwargs['default'] = False  # make it False by default to avoid 'required missing' errors
-        super(Boolean, self).__init__(**kwargs)
-        self.trues = trues
-        self.falses = falses
+        super(Boolean, self).__init__(trues=trues, falses=falses, **kwargs)
 
     @property
     def python_type(self):
@@ -267,8 +248,8 @@ class Choice(Validator):
 
     def __init__(self, options, python_type=str, multivalue=False, **kwargs):
         super(Choice, self).__init__(
-            python_type=python_type, multivalue=multivalue, **kwargs)
-        self.options = options
+            options=options, python_type=python_type, multivalue=multivalue,
+            **kwargs)
 
     @property
     def python_type(self):

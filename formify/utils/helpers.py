@@ -45,6 +45,7 @@ def is_mapping(value):
     """
     return is_sequence(value) and hasattr(value, 'keys')
 
+
 def get_multimapping_getlist(value):
     """Retrieve ``getlist`` method (used to get all values for given key) if
     *value* is a multi-dictionary object.
@@ -57,3 +58,23 @@ def get_multimapping_getlist(value):
         return value.getlist
     else:
         return None
+
+
+def iterobjattrs(subject, name_matcher=None, value_matcher=None):
+    """For given object generate (name, value) pairs of each matching object's
+    attribute.
+
+    :param subject:
+        source object
+    :param name_matcher:
+        single-argument callable taking attribute name and returning ``True``
+        if the attribute should be yielded or ``False`` otherwise
+    :param value_matcher:
+        single-argument callable taking attribute value and returning ``True``
+        if the attribute should be yielded or ``False`` otherwise
+    """
+    for name in dir(subject):
+        if name_matcher is None or name_matcher(name):
+            value = getattr(subject, name)
+            if value_matcher is None or value_matcher(value):
+                yield name, value

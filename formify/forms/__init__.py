@@ -5,6 +5,7 @@ from formify.objproxy import create_proxy
 from formify.undefined import Undefined
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import OrderedDict
+from formify.validators.grouping import MappedGroup
 
 
 class Field(object):
@@ -14,20 +15,20 @@ class Field(object):
     later use to submit his data to validators. There will be one field object
     created for each validator in given schema.
 
-    :param form:
-        the form that owns this field
+    :param owner:
+        the owner of this field
     :param validator:
-        validator used to validate data
+        validator for which the field is created
     """
 
-    def __init__(self, form, validator):
-        self._form = weakref.ref(form)
+    def __init__(self, owner, validator):
+        self._owner = weakref.ref(owner)
         self._validator = validator
 
     @property
-    def form(self):
-        """The form this field belongs to."""
-        return self._form()
+    def owner(self):
+        """The owner of this field."""
+        return self._owner()
 
     @property
     def validator(self):
@@ -118,6 +119,19 @@ class Field(object):
             return self.validator.process(values[-1])
 
 
+class SchemaVisitor(object):
+    """Converts schema validators into form fields."""
+
+    def __init__(self, schema):
+        self._schema = schema
+
+    def get_fields(self):
+        fields = OrderedDict()
+        for validator in self._schema.itervalues():
+            fields[validator.key] = validator.accept(self)
+        return fields
+
+
 class Form(object):
     """Connector of schema, validators and fields.
 
@@ -133,13 +147,13 @@ class Form(object):
         If not given default one will be determined by *obj* type
     """
     __schema__ = None
+    __schema_visitor__ = SchemaVisitor
     __undefined_values__ = set()
 
     def __init__(self, schema=None, data=None, obj=None, proxy_cls=create_proxy):
 
         # Initialize private members
         self._obj = obj
-        self._fields = OrderedDict()
         self._proxy_cls = proxy_cls
 
         # Create schema instance
@@ -151,8 +165,7 @@ class Form(object):
             raise TypeError("unable to create form without schema")
 
         # Create form field for each validator
-        for validator in self._schema.itervalidators():
-            self._fields[validator.key] = self.create_field(validator)
+        self._fields = self.__schema_visitor__(self._schema).get_fields()
 
         # Forward data to underlying schema and process it
         if data is not None:
@@ -249,14 +262,13 @@ class Form(object):
         else:
             return list(v for v in values if v not in self.__undefined_values__)
 
-    def create_field(self, validator):
-        """Create apropriate field object for given validator.
+    def visit(self, validator):
+        """Visit *validator* to create apropriate field for it.
 
-        This method calls ``visit_[name]`` method that must be implemented in
-        order to create field for *validator*. If such method is not
-        implemented, :exc:`NotImplementedError` is raised. If necessary, this
-        method may be overloaded to provide default field instead of raising
-        exception.
+        This method reads validator's :attr:`Validator.__visit_name__` property
+        in order to determine which ``visit_*`` method should be called. Once
+        such method is found it is called and its return value is returned.
+        Otherwise :exc:`NotImplementedError` is raised.
         """
         visit_method = getattr(self, "visit_%s" % validator.__visit_name__, None)
         if visit_method is None:

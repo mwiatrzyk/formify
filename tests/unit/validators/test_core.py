@@ -2,6 +2,7 @@ import decimal
 import unittest
 
 from formify import exc
+from formify.schema import Schema
 from formify.validators import (
     String, Regex, Numeric, Integer, Float, Decimal, Boolean)
 

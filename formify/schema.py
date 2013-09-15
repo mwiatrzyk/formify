@@ -1,4 +1,3 @@
-import copy
 import itertools
 import collections
 
@@ -6,6 +5,7 @@ from formify.event import add_listener
 from formify.objproxy import create_proxy
 from formify.undefined import Undefined
 from formify.validators import Validator
+from formify.utils import helpers
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import AttrDict, OrderedDict
 
@@ -22,13 +22,14 @@ class SchemaMeta(type):
     def __validators__(cls):
         """Map of unbound validators added to schema."""
         validators = []
-        for k in dir(cls):
-            if not k.startswith('_'):
-                v = getattr(cls, k)
-                if isinstance(v, Validator):
-                    if v._key is None:
-                        v._key = k
-                    validators.append((v._key, v))
+        name_matcher = lambda k: k != '__validators__'
+        value_matcher = lambda v: isinstance(v, Validator)
+        for k, v in helpers.iterobjattrs(cls, name_matcher, value_matcher):
+            if k in _reserved_validator_keys:
+                raise TypeError("name %r is reserved")
+            if v._key is None:
+                v._key = k
+            validators.append((v._key, v))
         validators.sort(key=lambda x: x[1]._creation_order)
         return OrderedDict(validators)
 
@@ -45,63 +46,48 @@ class Schema(object):
     __info_default__ = {}
 
     def __init__(self, **kwargs):
-
-        # Initialize private properties
-        self._bound_validators = {}
-
-        # Bind validators to schema and initialize with defaults
-        for name, validator in self.__validators__.items():
+        for validator in self.__validators__.itervalues():
             validator.bind(self)
-            if name not in kwargs:
-                default = validator.default
-                if default is not Undefined:
-                    setattr(self, name, copy.deepcopy(default))
-
-        # Process data passed to __init__ method
         for k, v in kwargs.items():
             setattr(self, k, v)
 
     def __iter__(self):
         for k in self.__validators__:
-            if k in self._bound_validators:
+            if Validator.is_bound_to(self, k):
                 yield k
 
     def __contains__(self, key):
-        return key in self._bound_validators
+        return Validator.is_bound_to(self, key)
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
             super(Schema, self).__setattr__(name, value)
-        elif name in self._bound_validators:
-            self._bound_validators[name].process(value)
+        elif Validator.is_bound_to(self, name):
+            Validator.get_bound_validator(self, name).process(value)
         elif name in self.__validators__:  # Rebind removed validator
             self.__validators__[name].bind(self).process(value)
         else:
-            raise AttributeError("no validator named '%s'" % name)
+            raise AttributeError("there is no validator with key %r" % name)
 
     def __getattribute__(self, name):
         if name.startswith('_') or name not in self.__validators__:
             return super(Schema, self).__getattribute__(name)
-        elif name in self._bound_validators:
-            return self._bound_validators[name].value
+        elif Validator.is_bound_to(self, name):
+            return Validator.get_bound_validator(self, name).value
         else:
-            raise AttributeError("validator '%s' was deleted from schema" % name)
-
-    def __delattr__(self, name):
-        if name in self._bound_validators:
-            self._bound_validators[name].process(Undefined)
-        else:
-            super(Schema, self).__delattr__(name)
+            raise AttributeError(
+                "validator with key %r was deleted from schema (tip: it will "
+                "be re-bound once attribute is set)" % name)
 
     def __getitem__(self, key):
-        if key in self._bound_validators:
-            return self._bound_validators[key]
+        if Validator.is_bound_to(self, key):
+            return Validator.get_bound_validator(self, key)
         else:
             raise KeyError(key)
 
     def __delitem__(self, key):
-        if key in self._bound_validators:
-            self._bound_validators[key].unbind()
+        if Validator.is_bound_to(self, key):
+            Validator.get_bound_validator(self, key).unbind()
         else:
             raise KeyError(key)
 
@@ -147,51 +133,26 @@ class Schema(object):
                 result = False
         return result
 
-    def iterkeys(self, skip_undefined=False):
-        """Generator of validator keys.
-
-        :param skip_undefined:
-            if ``True``, keys of validators that do not have a value will be
-            skipped (default is ``False``)
-        """
-        if skip_undefined:
-            for key in self:
-                if self[key].value is not Undefined:
-                    yield key
-        else:
-            for key in self:
-                yield key
-
-    def keys(self, skip_undefined=False):
-        """Return list of validator keys."""
-        return list(self.iterkeys(skip_undefined))
-
-    def itervalues(self, skip_undefined=False):
-        """Generator of processed validator values."""
-        for key in self.iterkeys(skip_undefined):
-            yield self[key].value
-
-    def values(self, skip_undefined=False):
-        """Return list of processed validator values."""
-        return list(self.itervalues(skip_undefined))
-
-    def iteritems(self, skip_undefined=False):
-        """Generator of ``(key, value)`` pairs."""
-        for key in self.iterkeys(skip_undefined):
-            yield key, self[key].value
-
-    def items(self, skip_undefined=False):
-        """Return list of ``(key, value)`` pairs."""
-        return list(self.iteritems(skip_undefined))
-
-    def itervalidators(self):
-        """Generator of validator objects registered for this schema."""
+    def iterkeys(self):
         for key in self:
+            yield key
+
+    def keys(self):
+        return list(self.iterkeys())
+
+    def itervalues(self):
+        for key in self.iterkeys():
             yield self[key]
 
-    def validators(self):
-        """Return list of validator objects registered for this schema."""
-        return list(self.itervalidators())
+    def values(self):
+        return list(self.itervalues())
+
+    def iteritems(self):
+        for key in self.iterkeys():
+            yield key, self[key]
+
+    def items(self):
+        return list(self.iteritems())
 
     def populate(self, obj, extra=None, proxy_cls=create_proxy):
         """Update given object with current state of this form.
@@ -244,3 +205,6 @@ class Schema(object):
                     add_listener(sender.__validators__[arg], event, listener)
                 else:
                     raise TypeError("invalid event argument: %r" % arg)
+
+
+_reserved_validator_keys = set(k for k, v in helpers.iterobjattrs(Schema))

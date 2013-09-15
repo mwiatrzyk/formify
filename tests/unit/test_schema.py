@@ -161,16 +161,6 @@ class TestSchemaInstance(unittest.TestCase):
         # When / Then
         self.assertEqual(test._private, 'test')
 
-    def test_getattribute_delattr_validator(self):
-        """Deleting bound attribute is equal to initializing it with
-        ``Undefined`` value."""
-        # Given
-        test = self.Test(a='a')
-        # When
-        del test.a
-        # Then
-        self.assertEqual(test.a, Undefined)
-
     def test_getattribute_deleted_validator(self):
         """Deleting bound attribute object (via ``__delitem__``) removes it
         completely from current schema object (not class!), so access will
@@ -183,26 +173,6 @@ class TestSchemaInstance(unittest.TestCase):
             return test.a
         # Then
         self.assertRaises(AttributeError, getter)
-
-    def test_delattr_validator(self):
-        # Given
-        test = self.Test(a='test', b=123, c=False)
-        # When
-        del test.a
-        del test.c
-        # Then
-        self.assertIs(test.a, Undefined)
-        self.assertIs(test.c, Undefined)
-        self.assertEqual(test.b, 123)
-
-    def test_delattr_not_validator(self):
-        # Given
-        test = self.Test()
-        test._foo = True
-        # When
-        del test._foo
-        # Then
-        self.assertFalse(hasattr(test, '_foo'))
 
     def test_getitem_valid(self):
         # Given
@@ -253,15 +223,6 @@ class TestSchemaInstance(unittest.TestCase):
         # Given
         test = self.Test()
         # When
-        keys = list(test)
-        # Then
-        self.assertEqual(keys, ['a', 'b', 'c'])
-
-    def test_iter_delattr(self):
-        # Given
-        test = self.Test()
-        # When
-        del test.a
         keys = list(test)
         # Then
         self.assertEqual(keys, ['a', 'b', 'c'])

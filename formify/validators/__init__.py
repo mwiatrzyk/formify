@@ -1,3 +1,4 @@
+import copy
 import weakref
 
 from formify import exc, event
@@ -95,11 +96,35 @@ class Validator(object):
             return value
 
     def is_bound(self):
-        """Check if this validator is bound to schema."""
+        """Check if this validator is bound."""
         return self._owner is not None
 
-    def bind(self, schema):
-        """Bind validator to given schema.
+    @staticmethod
+    def has_bound_validators(owner):
+        """Check if given *owner* has validators bound to it."""
+        return hasattr(owner, '_bound_validators')
+
+    @staticmethod
+    def is_bound_to(owner, key):
+        """Check if *key* is a key of validator bound to *owner*.
+
+        This method assumes that *owner* has at least one validator bound. Use
+        :meth:`has_bound_validators` to check such condition.
+
+        :param owner:
+            bound validator's owner
+        :param key:
+            bound validator's key
+        """
+        return key in owner._bound_validators
+
+    @staticmethod
+    def get_bound_validator(owner, key):
+        """Return instance of bound validator."""
+        return owner._bound_validators[key]
+
+    def bind(self, owner):
+        """Bind validator to given owner.
 
         This method returns new bound validator based on current one. Original
         validator (the one for which this method was called) remains unchanged.
@@ -118,20 +143,27 @@ class Validator(object):
 
         # Reset properties that cannot be modified
         bound._key = self._key
-        bound._owner = weakref.ref(schema)
+        bound._owner = weakref.ref(owner)
+
+        # Set default value
+        default = bound.default
+        if default is not Undefined:
+            bound.process(copy.deepcopy(default))
 
         # Forward all event retrieval requests to validator originally created
         # as schema attribute
         event.alias_of(bound, self, event.F_READ_ACCESS)
 
         # Bind newly created validator to schema and return
-        schema._bound_validators[self._key] = bound
+        if not hasattr(owner, '_bound_validators'):
+            owner._bound_validators = {}
+        owner._bound_validators[self._key] = bound
         return bound
 
     def unbind(self):
-        """Unbind this validator from current schema.
+        """Unbind this validator from current owner.
 
-        If this validator was not bound to any schema,
+        If this validator was not bound to any owner,
         :exc:`~formify.exc.NotBound` is raised.
         """
         if not self.is_bound():
@@ -253,6 +285,20 @@ class Validator(object):
         self._value = self._raise_if_unbound(self.validate, ValueError, self._value)
         return len(self.errors) == 0
 
+    def accept(self, visitor):
+        """Accept given visitor by calling visit method that matches
+        validator's :attr:`__visit_name__`.
+
+        :param visitor:
+            visitor object
+        """
+        name = "visit_%s" % self.__visit_name__
+        visit = getattr(visitor, name, None)
+        if visit is None:
+            raise NotImplementedError(
+                "the visitor %r does not have %r method" %(visitor, name))
+        return visit(self)
+
     @property
     def key(self):
         """The key assigned to this validator."""
@@ -265,6 +311,16 @@ class Validator(object):
         This is equal to validator's class name.
         """
         return self.__class__.__name__
+
+    @property
+    def namespace(self):
+        """Namespace of this validator."""
+        if not self.is_bound():
+            return Undefined
+        elif hasattr(self.owner, 'key'):
+            return self.owner.key
+        else:
+            return ''
 
     @property
     def owner(self):
@@ -345,5 +401,6 @@ class Validator(object):
 
 # Import most commonly used validators
 from formify.validators.core import (
-    Group, BaseString, String, Text, Regex, Numeric, Integer, Float, Decimal,
-    Boolean, Choice)
+    BaseString, String, Text, Regex, Numeric, Integer, Float, Decimal, Boolean,
+    Choice)
+from formify.validators.grouping import Group
