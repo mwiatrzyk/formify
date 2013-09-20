@@ -403,4 +403,4 @@ class Validator(object):
 from formify.validators.core import (
     BaseString, String, Text, Regex, Numeric, Integer, Float, Decimal, Boolean,
     Choice)
-from formify.validators.grouping import Group
+from formify.validators.grouping import Map

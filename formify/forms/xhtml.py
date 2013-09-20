@@ -111,6 +111,30 @@ class Tag(object):
         return self
 
 
+class SchemaVisitor(forms.SchemaVisitor):
+
+    def visit_basestring(self, validator):
+        return TextField(self.owner, validator)
+
+    def visit_text(self, validator):
+        return TextAreaField(self.owner, validator)
+
+    def visit_password(self, validator):
+        return PasswordField(self.owner, validator)
+
+    def visit_boolean(self, validator):
+        return CheckboxField(self.owner, validator)
+
+    def visit_choice(self, validator):
+        return ChoiceField(self.owner, validator, validator.multivalue)
+
+    def visit_numeric(self, validator):
+        return TextField(self.owner, validator)
+
+    def visit_map(self, validator):
+        return MapField(self.owner, validator)
+
+
 class Field(forms.Field):
     """Generic XHTML form field.
 
@@ -172,7 +196,7 @@ class InputField(Field):
         widget = Tag('input')
         widget.add_class("ffy-field-validator-%s" % self.validator.name)
         widget.attr.update({
-            'name': self.validator.key,
+            'name': self.id,
             'value': self.validator.raw_value,
             'type': self.__input_type__})
         return widget
@@ -209,7 +233,7 @@ class ChoiceField(Field):
             list of options widgets
         """
         widget = Tag('select', options)
-        widget.attr['name'] = self.validator.key
+        widget.attr['name'] = self.id
         if self.multiple:
             widget.attr['multiple'] = 'multiple'
         return widget
@@ -260,12 +284,12 @@ class RadioCheckboxChoiceField(ChoiceField):
 
     def create_option_widget(self, index, value, description, selected):
         # Generate ID for input and its label
-        id_ = "%s-%s" % (self.validator.key, index)
+        id_ = "%s-%s" % (self.id, index)
         # Generate radio input field
         widget = Tag('input')
         widget.attr.update({
             'type': 'checkbox' if self.multiple else 'radio',
-            'name': self.validator.key,
+            'name': self.id,
             'value': value,
             'id': id_})
         if selected:
@@ -292,7 +316,7 @@ class TextAreaField(Field):
 
     def create_widget(self):
         widget = Tag('textarea', self.validator.raw_value or u'')
-        widget.attr['name'] = self.validator.key
+        widget.attr['name'] = self.id
         widget.add_class("ffy-field-validator-%s" % self.validator.name)
         return widget
 
@@ -308,28 +332,20 @@ class SchemaField(Field):
         return list(self.create_widget())
 
 
-class SchemaVisitor(forms.SchemaVisitor):
+class MapField(forms.MapField):
+    __schema_visitor__ = SchemaVisitor
 
-    def visit_basestring(self, validator):
-        return TextField(self, validator)
+    def create_widget(self):
+        return self._fields
 
-    def visit_text(self, validator):
-        return TextAreaField(self, validator)
+    def create_label_widget(self):
+        return self.validator.label
 
-    def visit_password(self, validator):
-        return PasswordField(self, validator)
+    def create_description_widget(self):
+        return self.validator.description
 
-    def visit_boolean(self, validator):
-        return CheckboxField(self, validator)
-
-    def visit_choice(self, validator):
-        return ChoiceField(self, validator, validator.multivalue)
-
-    def visit_numeric(self, validator):
-        return TextField(self, validator)
-
-    def visit_mapped_group(self, validator):
-        return SchemaField(self, validator)
+    def create_errors_widget(self):
+        return None
 
 
 class Form(forms.Form):
@@ -338,10 +354,14 @@ class Form(forms.Form):
 
     def as_table(self, **kwargs):
         rows = []
-        for field in self.iterfields():
+        for field in self.walk():
+            widget = field.create_widget()
+            label_widget = field.create_label_widget()
+            description_widget = field.create_description_widget()
+            errors_widget = field.create_errors_widget()
             row = Tag('tr', [
-                Tag('td', [field.label_widget, Tag('br'), field.description_widget]),
-                Tag('td', [field.widget, field.errors_widget]),
+                Tag('td', [label_widget, Tag('br'), description_widget]),
+                Tag('td', [widget, errors_widget]),
             ])
             rows.append(row)
         return Tag('table', rows, attr=kwargs)

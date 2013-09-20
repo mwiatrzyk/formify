@@ -2,6 +2,8 @@
 
 from formify.validators import Validator
 
+from formify.utils.mixins import KeyValueMixin
+
 
 class _ValueProxy(object):
 
@@ -27,12 +29,20 @@ class _ValueProxy(object):
             raise AttributeError("validator '%s' was deleted from schema" % name)
 
 
-class BaseGroup(Validator):
-    pass
+class Group(Validator):
+    """Base class for grouping validators."""
+    __visit_name__ = 'group'
 
 
-class MappedGroup(BaseGroup):
-    __visit_name__ = 'mapped_group'
+class Map(Group, KeyValueMixin):
+    """Groups validators of different types."""
+    __visit_name__ = 'map'
+
+    def __init__(self, schema_cls, **kwargs):
+        super(Map, self).__init__(schema_cls=schema_cls, **kwargs)
+        self.__validators__ = schema_cls.__validators__
+        for validator in self.__validators__.itervalues():
+            validator.bind(self)
 
     def __iter__(self):
         for k in self.__validators__:
@@ -54,27 +64,6 @@ class MappedGroup(BaseGroup):
         else:
             raise KeyError(key)
 
-    def iterkeys(self):
-        for key in self:
-            yield key
-
-    def keys(self):
-        return list(self.iterkeys())
-
-    def itervalues(self):
-        for key in self.iterkeys():
-            yield self[key]
-
-    def values(self):
-        return list(self.itervalues())
-
-    def iteritems(self):
-        for key in self.iterkeys():
-            yield key, self[key]
-
-    def items(self):
-        return list(self.iteritems())
-
     def postvalidate(self, value):
         value = super(Group, self).postvalidate(value)
         for k, v in value.iteritems():
@@ -83,6 +72,13 @@ class MappedGroup(BaseGroup):
             except KeyError:
                 raise exc.ValidationError("invalid key: %s" % k)
         return value
+
+    def is_valid(self):
+        result = True
+        for validator in self.itervalues():
+            if not validator.is_valid():
+                result = False
+        return result
 
     @property
     def python_type(self):
@@ -93,14 +89,6 @@ class MappedGroup(BaseGroup):
         return _ValueProxy(self)
 
 
-class SequentialGroup(BaseGroup):
-    __visit_name__ = 'sequential_group'
-
-
-class Group(MappedGroup):
-
-    def __init__(self, schema_cls, **kwargs):
-        super(Group, self).__init__(schema_cls=schema_cls, **kwargs)
-        self.__validators__ = schema_cls.__validators__
-        for validator in self.__validators__.itervalues():
-            validator.bind(self)
+class Sequence(Group):
+    """Allows to use single validator multiple times."""
+    __visit_name__ = 'sequence'

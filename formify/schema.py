@@ -6,6 +6,7 @@ from formify.objproxy import create_proxy
 from formify.undefined import Undefined
 from formify.validators import Validator
 from formify.utils import helpers
+from formify.utils.mixins import KeyValueMixin
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import AttrDict, OrderedDict
 
@@ -34,7 +35,7 @@ class SchemaMeta(type):
         return OrderedDict(validators)
 
 
-class Schema(object):
+class Schema(KeyValueMixin):
     """Form schema base class.
 
     This class is responsible for grouping all validators in one object, making
@@ -132,27 +133,6 @@ class Schema(object):
             if not self[k].is_valid():
                 result = False
         return result
-
-    def iterkeys(self):
-        for key in self:
-            yield key
-
-    def keys(self):
-        return list(self.iterkeys())
-
-    def itervalues(self):
-        for key in self.iterkeys():
-            yield self[key]
-
-    def values(self):
-        return list(self.itervalues())
-
-    def iteritems(self):
-        for key in self.iterkeys():
-            yield key, self[key]
-
-    def items(self):
-        return list(self.iteritems())
 
     def populate(self, obj, extra=None, proxy_cls=create_proxy):
         """Update given object with current state of this form.

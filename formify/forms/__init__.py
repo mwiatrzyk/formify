@@ -1,11 +1,31 @@
 import weakref
+import collections
 
 from formify.utils import helpers
 from formify.objproxy import create_proxy
 from formify.undefined import Undefined
+from formify.utils.mixins import KeyValueMixin
 from formify.utils.decorators import memoized_property
 from formify.utils.collections import OrderedDict
-from formify.validators.grouping import MappedGroup
+from formify.validators.grouping import Map, Sequence
+
+
+class SchemaVisitor(object):
+    """Converts schema validators into form fields."""
+
+    def __init__(self, owner, schema):
+        self._owner = owner
+        self._schema = schema
+
+    @property
+    def owner(self):
+        return self._owner
+
+    def get_fields(self):
+        fields = OrderedDict()
+        for validator in self._schema.itervalues():
+            fields[validator.key] = validator.accept(self)
+        return fields
 
 
 class Field(object):
@@ -35,10 +55,18 @@ class Field(object):
         """The validator that is validating this field."""
         return self._validator
 
-    @property
+    @memoized_property
     def id(self):
         """ID that uniquely identifies this field within form."""
-        return self.validator.key
+        owner = self.owner
+        if not hasattr(owner, 'key'):
+            return self.validator.key
+        namespace = collections.deque([owner.key, self.validator.key])
+        while hasattr(owner, 'owner'):
+            owner = owner.owner
+            if hasattr(owner, 'key'):
+                namespace.appendleft(owner.key)
+        return '-'.join(namespace)
 
     @property
     def key(self):
@@ -52,27 +80,6 @@ class Field(object):
         This defaults to field class name.
         """
         return self.__class__.__name__
-
-    @property
-    def widget(self):
-        """Input widget used to collect data from user."""
-        return self.create_widget()
-
-    @property
-    def label_widget(self):
-        """Label widget used to render label of this field."""
-        return self.create_label_widget()
-
-    @property
-    def description_widget(self):
-        """Widget used to render field's description."""
-        return self.create_description_widget()
-
-    @property
-    def errors_widget(self):
-        """Widget used to display processing and validation errors that occured
-        for this field."""
-        return self.create_errors_widget()
 
     def create_widget(self):
         """Create and return input widget."""
@@ -119,20 +126,35 @@ class Field(object):
             return self.validator.process(values[-1])
 
 
-class SchemaVisitor(object):
-    """Converts schema validators into form fields."""
+class GroupField(Field):
+    """A field that groups other fields (including itself) into larger
+    structures."""
+    __schema_visitor__ = SchemaVisitor
 
-    def __init__(self, schema):
-        self._schema = schema
-
-    def get_fields(self):
-        fields = OrderedDict()
-        for validator in self._schema.itervalues():
-            fields[validator.key] = validator.accept(self)
-        return fields
+    @memoized_property
+    def _fields(self):
+        return self.__schema_visitor__(self, self.validator).get_fields()
 
 
-class Form(object):
+class MapField(GroupField, KeyValueMixin):
+    """A field that groups fields that have names."""
+
+    def __iter__(self):
+        for key in self._fields:
+            yield key
+
+    def __getitem__(self, key):
+        if key in self._fields:
+            return self._fields[key]
+        else:
+            raise KeyError(key)
+
+
+class SequenceField(GroupField):
+    """A field that groups multiple fields of same kind."""
+
+
+class Form(KeyValueMixin):
     """Connector of schema, validators and fields.
 
     :param schema:
@@ -165,7 +187,7 @@ class Form(object):
             raise TypeError("unable to create form without schema")
 
         # Create form field for each validator
-        self._fields = self.__schema_visitor__(self._schema).get_fields()
+        self._fields = self.__schema_visitor__(self, self._schema).get_fields()
 
         # Forward data to underlying schema and process it
         if data is not None:
@@ -176,22 +198,6 @@ class Form(object):
     def __iter__(self):
         for key in self._fields:
             yield key
-
-    def __setattr__(self, name, value):
-        if name.startswith('_'):
-            super(Form, self).__setattr__(name, value)
-        elif name in self._fields:
-            self._fields[name].process([value])
-        else:
-            raise AttributeError("no such field: %s" % name)
-
-    def __getattr__(self, name):
-        if name.startswith('_') or name.startswith('visit_'):
-            return super(Form, self).__getattribute__(name)
-        elif name in self._fields:
-            return self._fields[name].validator.value
-        else:
-            raise AttributeError("no such field: %s" % name)
 
     def __getitem__(self, key):
         if key in self._fields:
@@ -209,8 +215,8 @@ class Form(object):
             getlist = lambda k: [data[k]]
 
         # Forward data to apropriate field to be processed
-        for field in self.iterfields():
-            key = field.key
+        for field in self.walk():
+            key = field.id
             if key in data:
                 values = self.remove_undefined(key, getlist(key))
                 if values:
@@ -224,7 +230,7 @@ class Form(object):
 
         # Iterate through each field and check if object has corresponding key
         # If so, use it as data source for the field
-        for field in self.iterfields():
+        for field in self.itervalues():
             key = field.key
             if key in obj:
                 field.process([obj[key]])
@@ -262,39 +268,21 @@ class Form(object):
         else:
             return list(v for v in values if v not in self.__undefined_values__)
 
-    def visit(self, validator):
-        """Visit *validator* to create apropriate field for it.
-
-        This method reads validator's :attr:`Validator.__visit_name__` property
-        in order to determine which ``visit_*`` method should be called. Once
-        such method is found it is called and its return value is returned.
-        Otherwise :exc:`NotImplementedError` is raised.
-        """
-        visit_method = getattr(self, "visit_%s" % validator.__visit_name__, None)
-        if visit_method is None:
-            raise NotImplementedError(
-                "there is no 'visit_%s' method implemented in %r - the field "
-                "cannot be created" % (validator.__visit_name__, self.__class__))
-        return visit_method(validator)
-
     def is_valid(self):
         """Return ``True`` if underlying schema is valid or ``False``
         otherwise."""
         return self._schema.is_valid()
 
-    def iterkeys(self):
-        for key in self:
-            yield key
+    def walk(self):
 
-    def keys(self):
-        return list(self.iterkeys())
+        def generate(owner):
+            for field in owner.itervalues():
+                yield field
+                if isinstance(field, GroupField):
+                    for field in generate(field):
+                        yield field
 
-    def iterfields(self):
-        for key in self:
-            yield self[key]
-
-    def fields(self):
-        return list(self.iterfields())
+        return generate(self)
 
     def populate(self, obj=None):
         if obj is None and self.obj is None:
