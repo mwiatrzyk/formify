@@ -69,11 +69,6 @@ class Field(object):
         return '-'.join(namespace)
 
     @property
-    def key(self):
-        """The key of underlying validator."""
-        return self.validator.key
-
-    @property
     def name(self):
         """Field's name.
 
