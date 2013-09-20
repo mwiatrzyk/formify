@@ -2,7 +2,7 @@ import unittest
 
 from formify.schema import Schema
 from formify.validators import String, Integer
-from formify.validators.grouping import Group
+from formify.validators.grouping import Map
 
 
 class TestGroup(unittest.TestCase):
@@ -16,11 +16,11 @@ class TestGroup(unittest.TestCase):
         self.GroupedSchema = GroupedSchema
 
     def create_group_from_schema(self):
-        return Group(self.GroupedSchema)
+        return Map(self.GroupedSchema)
 
     def create_schema(self):
         class WrappingSchema(Schema):
-            baz = Group(self.GroupedSchema)
+            baz = Map(self.GroupedSchema)
         return WrappingSchema()
 
     def test_ok(self):
@@ -30,4 +30,3 @@ class TestGroup(unittest.TestCase):
         group.baz.foo = 'ala ma kota'
         print repr(group.baz.foo)
         print repr(group['baz']['foo'].value)
-        self.assertFalse(True)
