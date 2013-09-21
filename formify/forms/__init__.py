@@ -58,15 +58,10 @@ class Field(object):
     @memoized_property
     def id(self):
         """ID that uniquely identifies this field within form."""
-        owner = self.owner
-        if not hasattr(owner, 'key'):
+        if isinstance(self.owner, Field):
+            return "%s-%s" % (self.owner.id, self.validator.key)
+        else:
             return self.validator.key
-        namespace = collections.deque([owner.key, self.validator.key])
-        while hasattr(owner, 'owner'):
-            owner = owner.owner
-            if hasattr(owner, 'key'):
-                namespace.appendleft(owner.key)
-        return '-'.join(namespace)
 
     @property
     def name(self):
