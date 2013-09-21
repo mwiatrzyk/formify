@@ -47,12 +47,15 @@ class Field(object):
 
     @property
     def owner(self):
-        """The owner of this field."""
+        """The owner of this field.
+
+        The owner can be either :class:`Form` or :class:`GroupField` object.
+        """
         return self._owner()
 
     @property
     def validator(self):
-        """The validator that is validating this field."""
+        """Validator used to process data transfered to this field."""
         return self._validator
 
     @memoized_property
@@ -72,40 +75,45 @@ class Field(object):
         return self.__class__.__name__
 
     def create_widget(self):
-        """Create and return input widget."""
-        raise NotImplementedError("'create_widget' not implemented for %r" % self.__class__)
+        """Create data input and display widget."""
+        raise NotImplementedError(
+            "create_widget() not implemented for %r" %
+            self.__class__)
 
     def create_label_widget(self):
-        """Create and return label widget.
+        """Create label widget.
 
         If field has no label this method should return ``None``.
         """
-        raise NotImplementedError("'create_label_widget' not implemented for %r" % self.__class__)
+        raise NotImplementedError(
+            "create_label_widget() not implemented for %r" %
+            self.__class__)
 
     def create_description_widget(self):
-        """Create and return description widget.
+        """Create description widget.
 
         If field has no description text assigned this method should return
         ``None``.
         """
-        raise NotImplementedError()
+        raise NotImplementedError(
+            "create_description_widget() not implemented for %r" %
+            self.__class__)
 
     def create_errors_widget(self):
-        """Create and return errors widget.
+        """Create errors widget.
 
-        If field has no errors this method will return ``None``.
+        If field has no errors or if errors are notified in other way (f.e.
+        using dialog widgets) this method should return ``None``.
         """
-        raise NotImplementedError("'create_errors_widget' not implemented for %r" % self.__class__)
+        raise NotImplementedError(
+            "create_errors_widget() not implemented for %r" %
+            self.__class__)
 
     def process(self, values):
         """Process given list of values using underlying validator.
 
-        The processing takes place as following:
-
-        * if validator is multivalue validator, entire list is forwarded to
-          validator and processed
-        * if validator is not multivalue validator, only last item (i.e. most
-          recent one) is forwarded and processed
+        If underlying validator is not multivalue validator, only last value
+        from list is processed.
 
         :param values:
             list of values to be processed
@@ -117,17 +125,18 @@ class Field(object):
 
 
 class GroupField(Field):
-    """A field that groups other fields (including itself) into larger
+    """Base class for fields that aggregate other fields in larger
     structures."""
     __schema_visitor__ = SchemaVisitor
 
     @memoized_property
     def _fields(self):
+        """Return map of contained fields."""
         return self.__schema_visitor__(self, self.validator).get_fields()
 
 
 class MapField(GroupField, KeyValueMixin):
-    """A field that groups fields that have names."""
+    """Groups fields of different types and provides dict-like access to it."""
 
     def __iter__(self):
         for key in self._fields:
@@ -141,7 +150,7 @@ class MapField(GroupField, KeyValueMixin):
 
 
 class SequenceField(GroupField):
-    """A field that groups multiple fields of same kind."""
+    """Groups n-occurences of concrete field."""
 
 
 class Form(KeyValueMixin):
@@ -220,7 +229,7 @@ class Form(KeyValueMixin):
 
         # Iterate through each field and check if object has corresponding key
         # If so, use it as data source for the field
-        for field in self.itervalues():
+        for field in self.walk():
             key = field.key
             if key in obj:
                 field.process([obj[key]])
@@ -264,6 +273,7 @@ class Form(KeyValueMixin):
         return self._schema.is_valid()
 
     def walk(self):
+        """Generate all fields contained in form in a recursive way."""
 
         def generate(owner):
             for field in owner.itervalues():
