@@ -1,7 +1,13 @@
-"""Decorator function and classes."""
+"""Set of helper functions and classes."""
 
-import functools
-import threading
+
+_creation_order = 0
+def set_creation_order(self):
+    """Sets ``_creation_order`` property of given instance to the current value
+    of global counter and then increases that counter by one."""
+    global _creation_order
+    self._creation_order = _creation_order
+    _creation_order += 1
 
 
 class memoized_property(object):
