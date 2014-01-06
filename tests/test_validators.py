@@ -13,8 +13,8 @@ class TestValidator(unittest.TestCase):
         class UUT(formify.Validator):
             messages = dict(formify.Validator.messages)
             messages.update({
-                'unable_to_convert': 'Not a valid integer number',
-                'field_is_required': 'This field is required',
+                'conversion_error': 'Not a valid integer number',
+                'required_error': 'This field is required',
             })
             python_type = int
 
@@ -190,3 +190,40 @@ class TestRegex(unittest.TestCase):
         self.assertFalse(self.uut.is_valid())
         self.assertEqual('0x123', self.uut.value)
         self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
+
+
+class TestListOf(unittest.TestCase):
+
+    def setUp(self):
+
+        class Entity(formify.Entity):
+            pass
+
+        self.uut = formify.ListOf(formify.Integer(min_value=2, max_value=3), owner=Entity())
+
+    def test_whenScalarGiven_itIsConvertedToSingleElementList(self):
+        self.uut.raw_value = '123'
+
+        self.assertEqual([123], self.uut.value)
+
+    def test_whenListGiven_itIsProcessed(self):
+        self.uut.raw_value = ['123']
+
+        self.assertEqual([123], self.uut.value)
+
+    def test_whenConversionOfSomeElementsFails_theseElementsAreSetToNoneAndMapOfErrorsContainsThoseElements(self):
+        self.uut.raw_value = ['1', 'a', '2', 'b']
+
+        self.assertEqual([1, None, 2, None], self.uut.value)
+        self.assertEqual(2, len(self.uut.errors))
+        self.assertIn(1, self.uut.errors)
+        self.assertIn(3, self.uut.errors)
+
+    def test_whenValidationOfSomeElementsFails_mapOfErrorsContainsThoseElements(self):
+        self.uut.raw_value = [1, 2, 3, 4]
+
+        self.assertFalse(self.uut.is_valid())
+        self.assertEqual([1, 2, 3, 4], self.uut.value)
+        self.assertEqual(2, len(self.uut.errors))
+        self.assertIn(0, self.uut.errors)
+        self.assertIn(3, self.uut.errors)

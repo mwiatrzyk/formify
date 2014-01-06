@@ -31,17 +31,10 @@ class UnboundValidator(object):
 
 
 class Validator(object):
-    """Common base class for all types.
-
-    Instances of this class handle two kind of operations: type conversion and
-    validation of converted value. These two operations are separated -
-    conversion is invoked once :param:`raw_value` is set and validation once
-    :meth:`is_valid` is called. Any failure causes list of errors to be filled
-    with human-readable error description.
-    """
+    errors_container_type = list
     messages = {
-        'unable_to_convert': 'Unable to convert to value of type %(python_type)r: %(exc)s',
-        'field_is_required': 'This field is required'
+        'conversion_error': 'Unable to convert to value of type %(python_type)r: %(exc)s',
+        'required_error': 'This field is required'
     }
 
     def __new__(cls, *args, **kwargs):
@@ -56,14 +49,17 @@ class Validator(object):
         self.default = default
         self.value = None
         self.raw_value = default
-        self.errors = []
-        self.validators = []
+        self.errors = self.errors_container_type()
+
+    def __call__(self, value):
+        self.raw_value = value
+        return self.value
 
     def convert(self, value):
         try:
             return self.python_type(value)
         except ValueError, e:
-            raise exc.ConversionError('unable_to_convert',
+            raise exc.ConversionError('conversion_error',
                 value=value, python_type=self.python_type, exc=e)
 
     def try_convert(self, value):
@@ -72,12 +68,12 @@ class Validator(object):
         except exc.ConversionError, e:
             self.add_error(e.message_id, **e.params)
 
-    def validate(self):
+    def validate(self, value):
         pass
 
-    def try_validate(self):
+    def try_validate(self, value):
         try:
-            self.validate()
+            self.validate(value)
         except exc.ValidationError, e:
             self.add_error(e.message_id, **e.params)
             return False
@@ -88,9 +84,9 @@ class Validator(object):
         if self.errors:
             return False
         elif self.required and self.raw_value is None:
-            self.add_error('field_is_required')
+            self.add_error('required_error')
             return False
-        elif not self.try_validate():
+        elif not self.try_validate(self.value):
             return False
         else:
             return True
@@ -99,9 +95,6 @@ class Validator(object):
         message = self.messages[message_id] % params
         self.errors.append(message)
 
-    def add_validator(self, validator):
-        self.validators.append(validator)
-
     @property
     def raw_value(self):
         return self._raw_value
@@ -109,7 +102,7 @@ class Validator(object):
     @raw_value.setter
     def raw_value(self, value):
         self._raw_value = value
-        self.errors = []
+        self.errors = self.errors_container_type()
         if value is None:
             self.value = None
         else:
@@ -144,26 +137,26 @@ class String(BaseString):
     def python_type(self):
         return unicode
 
-    def validate(self):
+    def validate(self, value):
         if self.min_length is not None and self.max_length is not None:
-            self._validate_length_range()
+            self._validate_length_range(value)
         elif self.min_length is not None:
-            self._validate_min_length()
+            self._validate_min_length(value)
         elif self.max_length is not None:
-            self._validate_max_length()
+            self._validate_max_length(value)
 
-    def _validate_length_range(self):
-        if not self.min_length <= len(self.value) <= self.max_length:
+    def _validate_length_range(self, value):
+        if not self.min_length <= len(value) <= self.max_length:
             raise exc.ValidationError('length_out_of_range',
                 min_length=self.min_length,
                 max_length=self.max_length)
 
-    def _validate_min_length(self):
-        if len(self.value) < self.min_length:
+    def _validate_min_length(self, value):
+        if len(value) < self.min_length:
             raise exc.ValidationError('too_short', min_length=self.min_length)
 
-    def _validate_max_length(self):
-        if len(self.value) > self.max_length:
+    def _validate_max_length(self, value):
+        if len(value) > self.max_length:
             raise exc.ValidationError('too_long', max_length=self.max_length)
 
 
@@ -179,8 +172,8 @@ class Regex(BaseString):
         self.flags = flags
         self._compiled_pattern = re.compile(pattern, flags)
 
-    def validate(self):
-        if not self._compiled_pattern.match(self.value):
+    def validate(self, value):
+        if not self._compiled_pattern.match(value):
             raise exc.ValidationError('pattern_mismatch', pattern=self.pattern)
 
 
@@ -197,25 +190,25 @@ class Numeric(Validator):
         self.min_value = min_value
         self.max_value = max_value
 
-    def validate(self):
+    def validate(self, value):
         if self.min_value is not None and self.max_value is not None:
-            self._validate_value_range()
+            self._validate_value_range(value)
         elif self.min_value is not None:
-            self._validate_min_value()
+            self._validate_min_value(value)
         elif self.max_value is not None:
-            self._validate_max_value()
+            self._validate_max_value(value)
 
-    def _validate_value_range(self):
-        if not self.min_value <= self.value <= self.max_value:
+    def _validate_value_range(self, value):
+        if not self.min_value <= value <= self.max_value:
             raise exc.ValidationError('value_out_of_range',
                 min_value=self.min_value, max_value=self.max_value)
 
-    def _validate_min_value(self):
-        if self.value < self.min_value:
+    def _validate_min_value(self, value):
+        if value < self.min_value:
             raise exc.ValidationError('too_low', min_value=self.min_value)
 
-    def _validate_max_value(self):
-        if self.value > self.max_value:
+    def _validate_max_value(self, value):
+        if value > self.max_value:
             raise exc.ValidationError('too_high', max_value=self.max_value)
 
 
@@ -224,3 +217,43 @@ class Integer(Numeric):
     @property
     def python_type(self):
         return int
+
+
+class ListOf(Validator):
+    errors_container_type = dict
+
+    def __init__(self, validator, **kwargs):
+        super(ListOf, self).__init__(**kwargs)
+        self.validator = self.__create_validator(validator)
+
+    def __create_validator(self, validator):
+        if isinstance(validator, UnboundValidator):
+            return validator.bind(self)
+        else:
+            return validator(owner=self)
+
+    @property
+    def python_type(self):
+        return list
+
+    def try_convert(self, value):
+        values = self.__value_to_list(value)
+        for i in xrange(len(values)):
+            values[i] = self.validator(values[i])
+            if self.validator.errors:
+                self.errors.setdefault(i, []).extend(self.validator.errors)
+        return values
+
+    def __value_to_list(self, value):
+        if isinstance(value, list):
+            return list(value)
+        else:
+            return [value]
+
+    def try_validate(self, value):
+        for i in xrange(len(value)):
+            self.validator.errors = []
+            self.validator.try_validate(value[i])
+            if self.validator.errors:
+                self.errors.setdefault(i, []).extend(self.validator.errors)
+        return not bool(self.errors)
