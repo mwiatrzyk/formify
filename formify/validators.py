@@ -26,7 +26,7 @@ class UnboundValidator(object):
         return "<%s.Unbound%s object at 0x%x>" % (
             self._validator.__module__, self._validator.__name__, id(self))
 
-    def bind(self, owner):
+    def __call__(self, owner):
         return self._validator(owner=owner, *self._args, **self._kwargs)
 
 
@@ -219,14 +219,8 @@ class ListOf(Validator):
 
     def __init__(self, validator, min_length=None, **kwargs):
         super(ListOf, self).__init__(**kwargs)
-        self.validator = self.__create_validator(validator)
+        self.validator = validator(owner=self)
         self.min_length = min_length
-
-    def __create_validator(self, validator):
-        if isinstance(validator, UnboundValidator):
-            return validator.bind(self)
-        else:
-            return validator(owner=self)
 
     @property
     def python_type(self):

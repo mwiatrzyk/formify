@@ -62,7 +62,7 @@ class Entity(object):
     def __validators__(self):
         validators = collections.OrderedDict()
         for k, v in self.__class__.__validators__.iteritems():
-            validators[k] = v.bind(self)
+            validators[k] = v(owner=self)
         return validators
 
     @property
