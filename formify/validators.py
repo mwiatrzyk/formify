@@ -48,12 +48,16 @@ class Validator(object):
         self.required = required
         self.default = default
         self.value = None
-        self.raw_value = default
-        self.errors = self.errors_container_type()
+        self(default)
 
     def __call__(self, value):
+        self.errors = self.errors_container_type()
         self.raw_value = value
-        return self.value
+        if value is None:
+            value = self.value = None
+        else:
+            value = self.value = self.try_convert(value)
+        return value
 
     def convert(self, value):
         try:
@@ -94,19 +98,6 @@ class Validator(object):
     def add_error(self, message_id, **params):
         message = self.messages[message_id] % params
         self.errors.append(message)
-
-    @property
-    def raw_value(self):
-        return self._raw_value
-
-    @raw_value.setter
-    def raw_value(self, value):
-        self._raw_value = value
-        self.errors = self.errors_container_type()
-        if value is None:
-            self.value = None
-        else:
-            self.value = self.try_convert(value)
 
     @property
     def python_type(self):
@@ -221,10 +212,15 @@ class Integer(Numeric):
 
 class ListOf(Validator):
     errors_container_type = dict
+    messages = dict(Validator.messages)
+    messages.update({
+        'too_short': 'Expecting at least %(min_length)s elements'
+    })
 
-    def __init__(self, validator, **kwargs):
+    def __init__(self, validator, min_length=None, **kwargs):
         super(ListOf, self).__init__(**kwargs)
         self.validator = self.__create_validator(validator)
+        self.min_length = min_length
 
     def __create_validator(self, validator):
         if isinstance(validator, UnboundValidator):
@@ -250,7 +246,17 @@ class ListOf(Validator):
         else:
             return [value]
 
+    def validate(self, value):
+        if self.min_length is not None:
+            self._validate_min_length(value)
+
+    def _validate_min_length(self, value):
+        if len(value) < self.min_length:
+            raise exc.ValidationError('too_short', min_length=self.min_length)
+
     def try_validate(self, value):
+        if not super(ListOf, self).try_validate(value):
+            return False
         for i in xrange(len(value)):
             self.validator.errors = []
             self.validator.try_validate(value[i])

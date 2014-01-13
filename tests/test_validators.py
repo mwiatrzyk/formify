@@ -28,31 +28,26 @@ class TestValidator(unittest.TestCase):
     def test_whenCreatingWithOwner_boundValidatorIsCreated(self):
         self.assertIsInstance(self.uut, self.UUT)
 
-    def test_whenRawValueIsSet_itIsConverted(self):
-        self.assertIs(self.uut.value, None)
-        self.assertIs(self.uut.raw_value, None)
+    def test_whenCalledWithConvertibleValue_conversionSucceeds(self):
+        value = self.uut('123')
 
-        self.uut.raw_value = '123'
-
+        self.assertIs(value, self.uut.value)
         self.assertEqual('123', self.uut.raw_value)
         self.assertEqual(123, self.uut.value)
 
-    def test_whenUnableToConvert_validateReturnsFalseAndMapOfErrorsIsFilled(self):
-        self.uut.raw_value = 'abc'
+    def test_whenCalledWithNotConvertibleValue_returnsNoneAndConversionFails(self):
+        value = self.uut('abc')
 
+        self.assertIs(value, None)
         self.assertIn('Not a valid integer number', self.uut.errors)
         self.assertFalse(self.uut.is_valid())
 
-    def test_settingAnotherValueClearsMapOfErrors(self):
-        self.uut.raw_value = 'abc'
-
+    def test_callingWithConvertibleValueClearsExistingMapOfErrors(self):
+        self.uut('abc')
         self.assertEqual(1, len(self.uut.errors))
-        self.assertFalse(self.uut.is_valid())
 
-        self.uut.raw_value = '123'
-
+        self.uut('123')
         self.assertEqual(0, len(self.uut.errors))
-        self.assertTrue(self.uut.is_valid())
 
     def test_whenRequiredAndValueIsMissing_validationFails(self):
         self.assertFalse(self.uut.is_valid())
@@ -71,7 +66,7 @@ class TestString(unittest.TestCase):
     def test_conversion(self):
         uut = formify.String(owner=self.entity)
 
-        uut.raw_value = 123
+        uut(123)
 
         self.assertIsInstance(uut.value, unicode)
         self.assertEqual(u'123', uut.value)
@@ -79,33 +74,33 @@ class TestString(unittest.TestCase):
     def test_minimalStringLengthConstraint(self):
         uut = formify.String(owner=self.entity, min_length=4)
 
-        uut.raw_value = 'spam'
+        uut('spam')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = 'foo'
+        uut('foo')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expecting at least 4 characters', uut.errors[0])
 
     def test_maximalStringLengthConstraint(self):
         uut = formify.String(owner=self.entity, max_length=3)
 
-        uut.raw_value = 'foo'
+        uut('foo')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = 'spam'
+        uut('spam')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expecting at most 3 characters', uut.errors[0])
 
     def test_lengthRange(self):
         uut = formify.String(owner=self.entity, min_length=3, max_length=4)
 
-        uut.raw_value = 'foo'
+        uut('foo')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = 'spam'
+        uut('spam')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = 'wonderful spam'
+        uut('wonderful spam')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expected number of characters is between 3 and 4', uut.errors[0])
 
@@ -126,7 +121,7 @@ class TestNumeric(unittest.TestCase):
     def test_conversion(self):
         uut = self.UUT(owner=self.entity)
 
-        uut.raw_value = '123'
+        uut('123')
 
         self.assertIsInstance(uut.value, int)
         self.assertEqual(123, uut.value)
@@ -134,36 +129,36 @@ class TestNumeric(unittest.TestCase):
     def test_minimalValueConstraint(self):
         uut = self.UUT(owner=self.entity, min_value=4)
 
-        uut.raw_value = '4'
+        uut('4')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = '3'
+        uut('3')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expecting value greater or equal to 4', uut.errors[0])
 
     def test_maximalValueConstraint(self):
         uut = self.UUT(owner=self.entity, max_value=5)
 
-        uut.raw_value = '5'
+        uut('5')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = '6'
+        uut('6')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expecting value less or equal to 5', uut.errors[0])
 
     def test_valueRange(self):
         uut = self.UUT(owner=self.entity, min_value=4, max_value=6)
 
-        uut.raw_value = '4'
+        uut('4')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = '5'
+        uut('5')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = '6'
+        uut('6')
         self.assertTrue(uut.is_valid())
 
-        uut.raw_value = '3'
+        uut('3')
         self.assertFalse(uut.is_valid())
         self.assertEqual('Expecting value between 4 and 6', uut.errors[0])
 
@@ -179,13 +174,13 @@ class TestRegex(unittest.TestCase):
         self.uut = formify.Regex(r'^[0-9]+$', owner=Entity())
 
     def test_whenValueMatchesPattern_validationSucceeds(self):
-        self.uut.raw_value = '123'
+        self.uut('123')
 
         self.assertTrue(self.uut.is_valid())
         self.assertEqual('123', self.uut.value)
 
     def test_whenValueDoesNotMatchPattern_validationFails(self):
-        self.uut.raw_value = '0x123'
+        self.uut('0x123')
 
         self.assertFalse(self.uut.is_valid())
         self.assertEqual('0x123', self.uut.value)
@@ -199,20 +194,21 @@ class TestListOf(unittest.TestCase):
         class Entity(formify.Entity):
             pass
 
+        self.Entity = Entity
         self.uut = formify.ListOf(formify.Integer(min_value=2, max_value=3), owner=Entity())
 
     def test_whenScalarGiven_itIsConvertedToSingleElementList(self):
-        self.uut.raw_value = '123'
+        self.uut('123')
 
         self.assertEqual([123], self.uut.value)
 
     def test_whenListGiven_itIsProcessed(self):
-        self.uut.raw_value = ['123']
+        self.uut(['123'])
 
         self.assertEqual([123], self.uut.value)
 
     def test_whenConversionOfSomeElementsFails_theseElementsAreSetToNoneAndMapOfErrorsContainsThoseElements(self):
-        self.uut.raw_value = ['1', 'a', '2', 'b']
+        self.uut(['1', 'a', '2', 'b'])
 
         self.assertEqual([1, None, 2, None], self.uut.value)
         self.assertEqual(2, len(self.uut.errors))
@@ -220,10 +216,19 @@ class TestListOf(unittest.TestCase):
         self.assertIn(3, self.uut.errors)
 
     def test_whenValidationOfSomeElementsFails_mapOfErrorsContainsThoseElements(self):
-        self.uut.raw_value = [1, 2, 3, 4]
+        self.uut([1, 2, 3, 4])
 
         self.assertFalse(self.uut.is_valid())
         self.assertEqual([1, 2, 3, 4], self.uut.value)
         self.assertEqual(2, len(self.uut.errors))
         self.assertIn(0, self.uut.errors)
         self.assertIn(3, self.uut.errors)
+
+    def whenMinLengthSpecified_validationFailsIfNumberOfListItemsIsLessThanMinLength(self):
+        uut = formify.ListOf(formify.Integer, min_length=2, owner=self.Entity())
+
+        uut([1, 2])
+        self.assertTrue(uut.is_valid())
+
+        uut([1])
+        self.assertFalse(uut.is_valid())
