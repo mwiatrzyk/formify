@@ -51,6 +51,9 @@ class Validator(object):
         self(default)
 
     def __call__(self, value):
+        return self.process(value)
+
+    def process(self, value):
         self.errors = self.errors_container_type()
         self.raw_value = value
         if value is None:
@@ -62,7 +65,7 @@ class Validator(object):
     def convert(self, value):
         try:
             return self.python_type(value)
-        except ValueError, e:
+        except Exception, e:
             raise exc.ConversionError('conversion_error',
                 value=value, python_type=self.python_type, exc=e)
 
@@ -214,46 +217,52 @@ class ListOf(Validator):
     errors_container_type = dict
     messages = dict(Validator.messages)
     messages.update({
-        'too_short': 'Expecting at least %(min_length)s elements'
+        'too_short': 'Expecting at least %(min_length)s elements',
+        'too_long': 'Expecting at most %(max_length)s elements'
     })
 
-    def __init__(self, validator, min_length=None, **kwargs):
+    def __init__(self, validator, min_length=None, max_length=None, **kwargs):
         super(ListOf, self).__init__(**kwargs)
-        self.validator = validator(owner=self)
+        self.validator = validator
         self.min_length = min_length
+        self.max_length = max_length
+        self._value_validators = []
+
+    def __iter__(self):
+        for validator in self._value_validators:
+            yield validator
+
+    def __len__(self):
+        return len(self._value_validators)
+
+    def __getitem__(self, index):
+        return self._value_validators[index]
 
     @property
     def python_type(self):
         return list
 
-    def try_convert(self, value):
-        values = self.__value_to_list(value)
-        for i in xrange(len(values)):
-            values[i] = self.validator(values[i])
-            if self.validator.errors:
-                self.errors.setdefault(i, []).extend(self.validator.errors)
-        return values
-
-    def __value_to_list(self, value):
-        if isinstance(value, list):
-            return list(value)
+    def process(self, value):
+        self.errors = []
+        self.raw_value = value
+        if value is None:
+            self._value_validators = []
+            self.value = None
         else:
-            return [value]
+            self._value_validators = self.__create_value_validators(value)
+            self.value = [x.value for x in self._value_validators] or None
+        return self.value
+
+    def __create_value_validators(self, value):
+        validators = []
+        for v in (self.try_convert(value) or []):
+            validator = self.validator(owner=self)
+            validator.process(v)
+            validators.append(validator)
+        return validators
 
     def validate(self, value):
-        if self.min_length is not None:
-            self._validate_min_length(value)
-
-    def _validate_min_length(self, value):
-        if len(value) < self.min_length:
+        if self.min_length is not None and len(value) < self.min_length:
             raise exc.ValidationError('too_short', min_length=self.min_length)
-
-    def try_validate(self, value):
-        if not super(ListOf, self).try_validate(value):
-            return False
-        for i in xrange(len(value)):
-            self.validator.errors = []
-            self.validator.try_validate(value[i])
-            if self.validator.errors:
-                self.errors.setdefault(i, []).extend(self.validator.errors)
-        return not bool(self.errors)
+        elif self.max_length is not None and len(value) > self.max_length:
+            raise exc.ValidationError('too_long', max_length=self.max_length)

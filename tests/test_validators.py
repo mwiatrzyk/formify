@@ -195,36 +195,55 @@ class TestListOf(unittest.TestCase):
             pass
 
         self.Entity = Entity
-        self.uut = formify.ListOf(formify.Integer(min_value=2, max_value=3), owner=Entity())
+        self.uut = formify.ListOf(formify.Integer(min_value=2, max_value=3), min_length=2, owner=Entity())
 
-    def test_whenScalarGiven_itIsConvertedToSingleElementList(self):
-        self.uut('123')
+    def test_ifUnableToConvertToList_conversionFails(self):
+        self.uut(123)
 
-        self.assertEqual([123], self.uut.value)
+        self.assertIs(self.uut.value, None)
 
     def test_whenListGiven_itIsProcessed(self):
         self.uut(['123'])
 
         self.assertEqual([123], self.uut.value)
 
-    def test_whenConversionOfSomeElementsFails_theseElementsAreSetToNoneAndMapOfErrorsContainsThoseElements(self):
-        self.uut(['1', 'a', '2', 'b'])
+    def test_whenValidatorIsIterated_itYieldsValueValidators(self):
+        self.uut('123')
 
+        self.assertEqual([1, 2, 3], [x.value for x in self.uut])
+
+    def test_lenReturnsNumberOfItemsInProcessedList(self):
+        self.assertEqual(0, len(self.uut))
+
+        self.uut('123')
+        self.assertEqual(3, len(self.uut))
+
+        self.uut('1')
+        self.assertEqual(1, len(self.uut))
+
+        self.uut('abc')
+        self.assertEqual(3, len(self.uut))
+
+    def test_whenAccessingIndex_validatorForValueAtThatIndexIsReturned(self):
+        self.uut('123')
+
+        self.assertEqual(1, self.uut[0].value)
+        self.assertEqual(2, self.uut[1].value)
+        self.assertEqual(3, self.uut[2].value)
+
+    def test_whenAccessingNonExistingIndex_exceptionIsRaised(self):
+        with self.assertRaises(IndexError):
+            self.uut[0]
+
+    def test_whenConversionOfSomeItemsFails_noneIsUsedInPlaceOfThatItems(self):
+        self.uut('1a2b')
+
+        self.assertTrue(self.uut.is_valid())  # Container remains valid
         self.assertEqual([1, None, 2, None], self.uut.value)
-        self.assertEqual(2, len(self.uut.errors))
-        self.assertIn(1, self.uut.errors)
-        self.assertIn(3, self.uut.errors)
+        self.assertFalse(self.uut[1].is_valid())
+        self.assertFalse(self.uut[3].is_valid())
 
-    def test_whenValidationOfSomeElementsFails_mapOfErrorsContainsThoseElements(self):
-        self.uut([1, 2, 3, 4])
-
-        self.assertFalse(self.uut.is_valid())
-        self.assertEqual([1, 2, 3, 4], self.uut.value)
-        self.assertEqual(2, len(self.uut.errors))
-        self.assertIn(0, self.uut.errors)
-        self.assertIn(3, self.uut.errors)
-
-    def whenMinLengthSpecified_validationFailsIfNumberOfListItemsIsLessThanMinLength(self):
+    def test_minLengthConstraint(self):
         uut = formify.ListOf(formify.Integer, min_length=2, owner=self.Entity())
 
         uut([1, 2])
@@ -232,3 +251,14 @@ class TestListOf(unittest.TestCase):
 
         uut([1])
         self.assertFalse(uut.is_valid())
+        self.assertIn('Expecting at least 2 elements', uut.errors)
+
+    def test_maxLengthConstraint(self):
+        uut = formify.ListOf(formify.Integer, max_length=4, owner=self.Entity())
+
+        uut([1, 2, 3, 4])
+        self.assertTrue(uut.is_valid())
+
+        uut([1, 2, 3, 4, 5])
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expecting at most 4 elements', uut.errors)
