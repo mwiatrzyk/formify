@@ -249,6 +249,9 @@ class TestListOf(unittest.TestCase):
         uut([1, 2])
         self.assertTrue(uut.is_valid())
 
+        uut([1, 2, 3])
+        self.assertTrue(uut.is_valid())
+
         uut([1])
         self.assertFalse(uut.is_valid())
         self.assertIn('Expecting at least 2 elements', uut.errors)
@@ -259,6 +262,29 @@ class TestListOf(unittest.TestCase):
         uut([1, 2, 3, 4])
         self.assertTrue(uut.is_valid())
 
+        uut([1, 2, 3])
+        self.assertTrue(uut.is_valid())
+
         uut([1, 2, 3, 4, 5])
         self.assertFalse(uut.is_valid())
         self.assertIn('Expecting at most 4 elements', uut.errors)
+
+    def test_lengthRangeConstraint(self):
+        uut = formify.ListOf(formify.Integer, min_length=2, max_length=4, owner=self.Entity())
+
+        uut([2, 2])
+        self.assertTrue(uut.is_valid())
+
+        uut([2, 2, 2])
+        self.assertTrue(uut.is_valid())
+
+        uut([2, 2, 2, 2])
+        self.assertTrue(uut.is_valid())
+
+        uut([2])
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expected number of elements is between 2 and 4', uut.errors)
+
+        uut([2, 2, 2, 2, 2])
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expected number of elements is between 2 and 4', uut.errors)

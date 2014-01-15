@@ -218,7 +218,8 @@ class ListOf(Validator):
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
-        'too_long': 'Expecting at most %(max_length)s elements'
+        'too_long': 'Expecting at most %(max_length)s elements',
+        'length_out_of_range': 'Expected number of elements is between %(min_length)s and %(max_length)s'
     })
 
     def __init__(self, validator, min_length=None, max_length=None, **kwargs):
@@ -262,7 +263,9 @@ class ListOf(Validator):
         return validators
 
     def validate(self, value):
-        if self.min_length is not None and len(value) < self.min_length:
+        if self.min_length is not None and self.max_length is not None and not self.min_length <= len(value) <= self.max_length:
+            raise exc.ValidationError('length_out_of_range', min_length=self.min_length, max_length=self.max_length)
+        elif self.min_length is not None and len(value) < self.min_length:
             raise exc.ValidationError('too_short', min_length=self.min_length)
         elif self.max_length is not None and len(value) > self.max_length:
             raise exc.ValidationError('too_long', max_length=self.max_length)
