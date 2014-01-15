@@ -25,10 +25,25 @@ class UnboundValidator(object):
 
     def __repr__(self):
         return "<%s.Unbound%s object at 0x%x>" % (
-            self._validator.__module__, self._validator.__name__, id(self))
+            self.validator.__module__, self.validator.__name__, id(self))
 
     def __call__(self, owner):
-        return self._validator(owner=owner, *self._args, **self._kwargs)
+        return self.validator(owner=owner, *self.args, **self.kwargs)
+
+    @property
+    def validator(self):
+        """Validator class."""
+        return self._validator
+
+    @property
+    def args(self):
+        """Positional args for validator class constructor."""
+        return self._args
+
+    @property
+    def kwargs(self):
+        """Named args for validator class constructor."""
+        return self._kwargs
 
 
 class Validator(object):
@@ -49,7 +64,9 @@ class Validator(object):
         self.required = required
         self.default = default
         self.owner = owner
+        self.errors = []
         self.value = None
+        self.raw_value = None
         self(default)
 
     def __call__(self, value):
