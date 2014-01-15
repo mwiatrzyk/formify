@@ -2,7 +2,8 @@ import re
 import weakref
 
 from formify import _utils, exc
-from formify.validators.mixins import ValidateMethodMixin, LengthValidationMixin
+from formify.validators.mixins import (
+    ValidateMethodMixin, LengthValidationMixin, ValueValidationMixin)
 
 
 class UnboundValidator(object):
@@ -175,7 +176,7 @@ class Regex(BaseString):
             raise exc.ValidationError('pattern_mismatch', pattern=self.pattern)
 
 
-class Numeric(Validator):
+class Numeric(Validator, ValueValidationMixin):
     messages = dict(Validator.messages)
     messages.update({
         'too_low': 'Expecting value greater or equal to %(min_value)s',
@@ -187,27 +188,6 @@ class Numeric(Validator):
         super(Numeric, self).__init__(**kwargs)
         self.min_value = min_value
         self.max_value = max_value
-
-    def validate(self, value):
-        if self.min_value is not None and self.max_value is not None:
-            self._validate_value_range(value)
-        elif self.min_value is not None:
-            self._validate_min_value(value)
-        elif self.max_value is not None:
-            self._validate_max_value(value)
-
-    def _validate_value_range(self, value):
-        if not self.min_value <= value <= self.max_value:
-            raise exc.ValidationError('value_out_of_range',
-                min_value=self.min_value, max_value=self.max_value)
-
-    def _validate_min_value(self, value):
-        if value < self.min_value:
-            raise exc.ValidationError('too_low', min_value=self.min_value)
-
-    def _validate_max_value(self, value):
-        if value > self.max_value:
-            raise exc.ValidationError('too_high', max_value=self.max_value)
 
 
 class Integer(Numeric):
