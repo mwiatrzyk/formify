@@ -2,6 +2,7 @@ import re
 import weakref
 
 from formify import _utils, exc
+from formify.validators.mixins import ValidateMethodMixin, LengthValidationMixin
 
 
 class UnboundValidator(object):
@@ -46,7 +47,7 @@ class UnboundValidator(object):
         return self._kwargs
 
 
-class Validator(object):
+class Validator(ValidateMethodMixin):
     messages = {
         'conversion_error': 'Unable to convert to value of type %(python_type)r: %(exc)s',
         'required_error': 'This field is required'
@@ -92,9 +93,6 @@ class Validator(object):
             return self.convert(value)
         except exc.ConversionError, e:
             self.add_error(e.message_id, **e.params)
-
-    def validate(self, value):
-        pass
 
     def try_validate(self, value):
         try:
@@ -146,7 +144,7 @@ class BaseString(Validator):
         return unicode
 
 
-class String(BaseString):
+class String(BaseString, LengthValidationMixin):
     messages = dict(BaseString.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s characters',
@@ -158,28 +156,6 @@ class String(BaseString):
         super(String, self).__init__(**kwargs)
         self.min_length = min_length
         self.max_length = max_length
-
-    def validate(self, value):
-        if self.min_length is not None and self.max_length is not None:
-            self._validate_length_range(value)
-        elif self.min_length is not None:
-            self._validate_min_length(value)
-        elif self.max_length is not None:
-            self._validate_max_length(value)
-
-    def _validate_length_range(self, value):
-        if not self.min_length <= len(value) <= self.max_length:
-            raise exc.ValidationError('length_out_of_range',
-                min_length=self.min_length,
-                max_length=self.max_length)
-
-    def _validate_min_length(self, value):
-        if len(value) < self.min_length:
-            raise exc.ValidationError('too_short', min_length=self.min_length)
-
-    def _validate_max_length(self, value):
-        if len(value) > self.max_length:
-            raise exc.ValidationError('too_long', max_length=self.max_length)
 
 
 class Regex(BaseString):
@@ -241,7 +217,7 @@ class Integer(Numeric):
         return int
 
 
-class ListOf(Validator):
+class ListOf(Validator, LengthValidationMixin):
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
@@ -289,14 +265,6 @@ class ListOf(Validator):
             validator.process(v)
             validators.append(validator)
         return validators
-
-    def validate(self, value):
-        if self.min_length is not None and self.max_length is not None and not self.min_length <= len(value) <= self.max_length:
-            raise exc.ValidationError('length_out_of_range', min_length=self.min_length, max_length=self.max_length)
-        elif self.min_length is not None and len(value) < self.min_length:
-            raise exc.ValidationError('too_short', min_length=self.min_length)
-        elif self.max_length is not None and len(value) > self.max_length:
-            raise exc.ValidationError('too_long', max_length=self.max_length)
 
     def is_valid(self):
         status = super(ListOf, self).is_valid()
