@@ -159,10 +159,6 @@ class String(BaseString):
         self.min_length = min_length
         self.max_length = max_length
 
-    @property
-    def python_type(self):
-        return unicode
-
     def validate(self, value):
         if self.min_length is not None and self.max_length is not None:
             self._validate_length_range(value)
