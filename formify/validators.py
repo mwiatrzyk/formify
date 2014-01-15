@@ -219,7 +219,8 @@ class ListOf(Validator):
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
         'too_long': 'Expecting at most %(max_length)s elements',
-        'length_out_of_range': 'Expected number of elements is between %(min_length)s and %(max_length)s'
+        'length_out_of_range': 'Expected number of elements is between %(min_length)s and %(max_length)s',
+        'inner_validator_error': 'At least one inner validator has failed'
     })
 
     def __init__(self, validator, min_length=None, max_length=None, **kwargs):
@@ -269,3 +270,14 @@ class ListOf(Validator):
             raise exc.ValidationError('too_short', min_length=self.min_length)
         elif self.max_length is not None and len(value) > self.max_length:
             raise exc.ValidationError('too_long', max_length=self.max_length)
+
+    def is_valid(self):
+        status = super(ListOf, self).is_valid()
+        if not status:
+            return False
+        for v in self:
+            if not v.is_valid():
+                status = False
+        if not status:
+            self.add_error('inner_validator_error')
+        return status

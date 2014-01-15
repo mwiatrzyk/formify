@@ -195,7 +195,7 @@ class TestListOf(unittest.TestCase):
             pass
 
         self.Entity = Entity
-        self.uut = formify.ListOf(formify.Integer(min_value=2, max_value=3), min_length=2, owner=Entity())
+        self.uut = formify.ListOf(formify.Integer, min_length=2, owner=Entity())
 
     def test_ifUnableToConvertToList_conversionFails(self):
         self.uut(123)
@@ -238,10 +238,19 @@ class TestListOf(unittest.TestCase):
     def test_whenConversionOfSomeItemsFails_noneIsUsedInPlaceOfThatItems(self):
         self.uut('1a2b')
 
-        self.assertTrue(self.uut.is_valid())  # Container remains valid
+        self.assertFalse(self.uut.is_valid())
         self.assertEqual([1, None, 2, None], self.uut.value)
         self.assertFalse(self.uut[1].is_valid())
         self.assertFalse(self.uut[3].is_valid())
+
+    def test_whenCheckingValidity_innerValidatorsAffectTheResult(self):
+        uut = formify.ListOf(formify.Integer(max_value=3), owner=self.Entity())
+
+        uut([3])
+        self.assertTrue(uut.is_valid())
+
+        uut([4])
+        self.assertFalse(uut.is_valid())
 
     def test_minLengthConstraint(self):
         uut = formify.ListOf(formify.Integer, min_length=2, owner=self.Entity())
