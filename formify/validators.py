@@ -47,7 +47,6 @@ class UnboundValidator(object):
 
 
 class Validator(object):
-    errors_container_type = list
     messages = {
         'conversion_error': 'Unable to convert to value of type %(python_type)r: %(exc)s',
         'required_error': 'This field is required'
@@ -73,7 +72,7 @@ class Validator(object):
         return self.process(value)
 
     def process(self, value):
-        self.errors = self.errors_container_type()
+        self.errors = []
         self.raw_value = value
         if value is None:
             value = self.value = None
@@ -247,7 +246,6 @@ class Integer(Numeric):
 
 
 class ListOf(Validator):
-    errors_container_type = dict
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
