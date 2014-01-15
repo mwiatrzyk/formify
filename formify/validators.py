@@ -1,4 +1,5 @@
 import re
+import weakref
 
 from formify import _utils, exc
 
@@ -47,6 +48,7 @@ class Validator(object):
         self.key = key
         self.required = required
         self.default = default
+        self.owner = owner
         self.value = None
         self(default)
 
@@ -101,6 +103,20 @@ class Validator(object):
     def add_error(self, message_id, **params):
         message = self.messages[message_id] % params
         self.errors.append(message)
+
+    @property
+    def owner(self):
+        if self._owner is None:
+           return self._owner
+        else:
+            return self._owner()
+
+    @owner.setter
+    def owner(self, value):
+        if value is None:
+            self._owner = value
+        else:
+            self._owner = weakref.ref(value)
 
     @property
     def python_type(self):
