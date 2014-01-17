@@ -36,6 +36,7 @@ class LengthValidationMixin(ValidateMethodMixin):
 class ValueValidationMixin(ValidateMethodMixin):
 
     def validate(self, value):
+        super(ValueValidationMixin, self).validate(value)
         if self.min_value is not None and self.max_value is not None:
             self.__validate_value_range(value)
         elif self.min_value is not None:
