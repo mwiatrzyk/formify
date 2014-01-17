@@ -65,10 +65,7 @@ class Validator(ValidateMethodMixin):
         self.required = required
         self.default = default
         self.owner = owner
-        self.errors = []
-        self.value = None
-        self.raw_value = None
-        self(default)
+        self.process(default)
 
     def __call__(self, value):
         return self.process(value)

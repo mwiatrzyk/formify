@@ -41,7 +41,7 @@ class Entity(object):
         elif name not in self:
             raise AttributeError("unable to set attribute: %s" % name)
         else:
-            self[name](value)
+            self[name].process(value)
 
     def __getattribute__(self, name):
         if name.startswith('_') or name not in self:
