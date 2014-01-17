@@ -1,16 +1,16 @@
 from formify import exc
 
 
-class ValidateMethodMixin(object):
+class ValidatorMixin(object):
 
     def validate(self, value):
         pass
 
 
-class LengthValidationMixin(ValidateMethodMixin):
+class LengthValidatorMixin(ValidatorMixin):
 
     def validate(self, value):
-        super(LengthValidationMixin, self).validate(value)
+        super(LengthValidatorMixin, self).validate(value)
         if self.min_length is not None and self.max_length is not None:
             self.__validate_length_range(value)
         elif self.min_length is not None:
@@ -33,10 +33,10 @@ class LengthValidationMixin(ValidateMethodMixin):
             raise exc.ValidationError('too_long', max_length=self.max_length)
 
 
-class ValueValidationMixin(ValidateMethodMixin):
+class ValueValidatorMixin(ValidatorMixin):
 
     def validate(self, value):
-        super(ValueValidationMixin, self).validate(value)
+        super(ValueValidatorMixin, self).validate(value)
         if self.min_value is not None and self.max_value is not None:
             self.__validate_value_range(value)
         elif self.min_value is not None:

@@ -3,7 +3,7 @@ import weakref
 
 from formify import _utils, exc
 from formify.validators.mixins import (
-    ValidateMethodMixin, LengthValidationMixin, ValueValidationMixin)
+    ValidatorMixin, LengthValidatorMixin, ValueValidatorMixin)
 
 
 class UnboundValidator(object):
@@ -48,7 +48,7 @@ class UnboundValidator(object):
         return self._kwargs
 
 
-class Validator(ValidateMethodMixin):
+class Validator(ValidatorMixin):
     messages = {
         'conversion_error': 'Unable to convert to value of type %(python_type)r: %(exc)s',
         'required_error': 'This field is required'
@@ -142,7 +142,7 @@ class BaseString(Validator):
         return unicode
 
 
-class String(BaseString, LengthValidationMixin):
+class String(BaseString, LengthValidatorMixin):
     messages = dict(BaseString.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s characters',
@@ -173,7 +173,7 @@ class Regex(BaseString):
             raise exc.ValidationError('pattern_mismatch', pattern=self.pattern)
 
 
-class Numeric(Validator, ValueValidationMixin):
+class Numeric(Validator, ValueValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({
         'too_low': 'Expecting value greater or equal to %(min_value)s',
@@ -194,7 +194,7 @@ class Integer(Numeric):
         return int
 
 
-class ListOf(Validator, LengthValidationMixin):
+class ListOf(Validator, LengthValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
