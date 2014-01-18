@@ -1,5 +1,6 @@
 import re
 import weakref
+import collections
 
 from formify import _utils, exc
 from formify.validators.mixins import (
@@ -55,16 +56,19 @@ class Validator(ValidatorMixin):
     }
 
     def __new__(cls, *args, **kwargs):
-        if 'owner' not in kwargs:
+        if kwargs.get('standalone', False):
+            return object.__new__(cls, owner=object(), *args, **kwargs)
+        elif 'owner' not in kwargs:
             return UnboundValidator(cls, *args, **kwargs)
         else:
             return object.__new__(cls, *args, **kwargs)
 
-    def __init__(self, key=None, required=True, default=None, owner=None):
+    def __init__(self, key=None, required=True, default=None, owner=None, standalone=False):
         self.key = key
         self.required = required
         self.default = default
         self.owner = owner
+        self.standalone = standalone
         self.process(default)
 
     def __call__(self, value):
@@ -225,19 +229,15 @@ class ListOf(Validator, LengthValidatorMixin):
         return list
 
     def process(self, value):
-        self.errors = []
-        self.raw_value = value
-        if value is None:
-            self._value_validators = []
-            self.value = None
-        else:
-            self._value_validators = self.__create_value_validators(value)
-            self.value = [x.value for x in self._value_validators] or None
-        return self.value
+        value = super(ListOf, self).process(value)
+        self._value_validators = self.__create_value_validators(value)
+        for i, validator in enumerate(self._value_validators):
+            value[i] = validator.value
+        return value
 
     def __create_value_validators(self, value):
         validators = []
-        for v in (self.try_convert(value) or []):
+        for v in (value or []):
             validator = self.validator(owner=self)
             validator.process(v)
             validators.append(validator)
@@ -248,6 +248,54 @@ class ListOf(Validator, LengthValidatorMixin):
         if not status:
             return False
         for v in self:
+            if not v.is_valid():
+                status = False
+        if not status:
+            self.add_error('inner_validator_error')
+        return status
+
+
+class Map(Validator):
+    messages = dict(Validator.messages)
+    messages.update({
+        'inner_validator_error': 'Inner validator has failed'
+    })
+
+    def __init__(self, validators, **kwargs):
+        super(Map, self).__init__(**kwargs)
+        if hasattr(validators, '__validators__'):
+            self.validators = self.__bind_validators(validators.__validators__)
+        else:
+            self.validators = self.__bind_validators(validators)
+
+    def __bind_validators(self, validators):
+        bound = collections.OrderedDict()
+        for k, v in validators.iteritems():
+            bound[k] = v(owner=self)
+        return bound
+
+    def __iter__(self):
+        for k in self.validators:
+            yield k
+
+    def __getitem__(self, key):
+        return self.validators[key]
+
+    @property
+    def python_type(self):
+        return dict
+
+    def process(self, value):
+        value = super(Map, self).process(value)
+        for k, v in (value or {}).iteritems():
+            value[k] = self.validators[k].process(v)
+        return value
+
+    def is_valid(self):
+        status = super(Map, self).is_valid()
+        if not status:
+            return False
+        for v in self.validators.itervalues():
             if not v.is_valid():
                 status = False
         if not status:

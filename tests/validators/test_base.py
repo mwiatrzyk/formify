@@ -297,3 +297,62 @@ class TestListOf(unittest.TestCase):
         uut([2, 2, 2, 2, 2])
         self.assertFalse(uut.is_valid())
         self.assertIn('Expected number of elements is between 2 and 4', uut.errors)
+
+
+class TestMap(unittest.TestCase):
+
+    def setUp(self):
+
+        class Entity(formify.Entity):
+            a = formify.Integer()
+            b = formify.String()
+
+        self.Entity = Entity
+        self.uut = formify.Map(self.Entity, standalone=True)
+
+    def test_createFromEntity(self):
+        uut = formify.Map(self.Entity, standalone=True)
+
+        uut({'a': '1', 'b': 2})
+
+        self.assertEqual({'a': 1, 'b': '2'}, uut.value)
+
+    def test_createFromDict(self):
+        uut = formify.Map({'a': formify.Integer, 'b': formify.String}, standalone=True)
+
+        uut({'a': '1', 'b': 2})
+
+        self.assertEqual({'a': 1, 'b': '2'}, uut.value)
+
+    def test_ifNoValidatorForInputDataKey_exceptionIsRaised(self):
+        with self.assertRaises(KeyError):
+            self.uut({'a': '1', 'b': 2, 'c': 3.14})
+
+    def test_ifUnableToConvertToDict_processingFails(self):
+        self.uut(123)
+
+        self.assertIs(self.uut.value, None)
+
+    def test_whenIterating_yieldsKeys(self):
+        self.assertEqual(['a', 'b'], list(self.uut))
+
+    def test_gettingAnItemReturnsInnerValidator(self):
+        self.uut({'a': '1', 'b': 2})
+
+        self.assertEqual(1, self.uut['a'].value)
+        self.assertEqual('2', self.uut['b'].value)
+
+    def test_whenConversionOfElementFails_noneIsUsedAsElementsValueAndValidationFails(self):
+        self.uut({'a': 'abc', 'b': 2})
+
+        self.assertEqual({'a': None, 'b': '2'}, self.uut.value)
+        self.assertFalse(self.uut.is_valid())
+
+    def test_whenValidationOfElementFails_correspondingInnerValidatorContainsErrors(self):
+        uut = formify.Map({'a': formify.Integer(max_value=2)}, standalone=True)
+
+        uut({'a': 3})
+
+        self.assertEqual({'a': 3}, uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertTrue(uut['a'].errors)
