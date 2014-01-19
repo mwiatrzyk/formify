@@ -7,9 +7,6 @@ class TestValidator(unittest.TestCase):
 
     def setUp(self):
 
-        class Entity(formify.Entity):
-            pass
-
         class UUT(formify.Validator):
             messages = dict(formify.Validator.messages)
             messages.update({
@@ -18,9 +15,8 @@ class TestValidator(unittest.TestCase):
             })
             python_type = int
 
-        self.Entity = Entity
         self.UUT = UUT
-        self.uut = UUT(owner=self.Entity())
+        self.uut = UUT(standalone=True)
 
     def test_whenCreatingWithoutOwner_unboundValidatorIsCreated(self):
         self.assertIsInstance(self.UUT(), formify.UnboundValidator)
@@ -56,15 +52,8 @@ class TestValidator(unittest.TestCase):
 
 class TestString(unittest.TestCase):
 
-    def setUp(self):
-
-        class Entity(formify.Entity):
-            pass
-
-        self.entity = Entity()
-
     def test_conversion(self):
-        uut = formify.String(owner=self.entity)
+        uut = formify.String(standalone=True)
 
         uut(123)
 
@@ -76,17 +65,13 @@ class TestNumeric(unittest.TestCase):
 
     def setUp(self):
 
-        class Entity(formify.Entity):
-            pass
-
         class UUT(formify.Numeric):
             python_type = int
 
-        self.entity = Entity()
         self.UUT = UUT
 
     def test_conversion(self):
-        uut = self.UUT(owner=self.entity)
+        uut = self.UUT(standalone=True)
 
         uut('123')
 
@@ -97,12 +82,7 @@ class TestNumeric(unittest.TestCase):
 class TestRegex(unittest.TestCase):
 
     def setUp(self):
-
-        class Entity(formify.Entity):
-            pass
-
-        self.entity = Entity()
-        self.uut = formify.Regex(r'^[0-9]+$', owner=Entity())
+        self.uut = formify.Regex(r'^[0-9]+$', standalone=True)
 
     def test_whenValueMatchesPattern_validationSucceeds(self):
         self.uut('123')
@@ -121,12 +101,7 @@ class TestRegex(unittest.TestCase):
 class TestListOf(unittest.TestCase):
 
     def setUp(self):
-
-        class Entity(formify.Entity):
-            pass
-
-        self.Entity = Entity
-        self.uut = formify.ListOf(formify.Integer, min_length=2, owner=Entity())
+        self.uut = formify.ListOf(formify.Integer, standalone=True)
 
     def test_ifUnableToConvertToList_conversionFails(self):
         self.uut(123)
@@ -175,7 +150,7 @@ class TestListOf(unittest.TestCase):
         self.assertFalse(self.uut[3].is_valid())
 
     def test_whenCheckingValidity_innerValidatorsAffectTheResult(self):
-        uut = formify.ListOf(formify.Integer(max_value=3), owner=self.Entity())
+        uut = formify.ListOf(formify.Integer(max_value=3), standalone=True)
 
         uut([3])
         self.assertTrue(uut.is_valid())
