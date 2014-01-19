@@ -71,39 +71,6 @@ class TestString(unittest.TestCase):
         self.assertIsInstance(uut.value, unicode)
         self.assertEqual(u'123', uut.value)
 
-    def test_minimalStringLengthConstraint(self):
-        uut = formify.String(owner=self.entity, min_length=4)
-
-        uut('spam')
-        self.assertTrue(uut.is_valid())
-
-        uut('foo')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expecting at least 4 characters', uut.errors[0])
-
-    def test_maximalStringLengthConstraint(self):
-        uut = formify.String(owner=self.entity, max_length=3)
-
-        uut('foo')
-        self.assertTrue(uut.is_valid())
-
-        uut('spam')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expecting at most 3 characters', uut.errors[0])
-
-    def test_lengthRange(self):
-        uut = formify.String(owner=self.entity, min_length=3, max_length=4)
-
-        uut('foo')
-        self.assertTrue(uut.is_valid())
-
-        uut('spam')
-        self.assertTrue(uut.is_valid())
-
-        uut('wonderful spam')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expected number of characters is between 3 and 4', uut.errors[0])
-
 
 class TestNumeric(unittest.TestCase):
 
@@ -125,42 +92,6 @@ class TestNumeric(unittest.TestCase):
 
         self.assertIsInstance(uut.value, int)
         self.assertEqual(123, uut.value)
-
-    def test_minimalValueConstraint(self):
-        uut = self.UUT(owner=self.entity, min_value=4)
-
-        uut('4')
-        self.assertTrue(uut.is_valid())
-
-        uut('3')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expecting value greater or equal to 4', uut.errors[0])
-
-    def test_maximalValueConstraint(self):
-        uut = self.UUT(owner=self.entity, max_value=5)
-
-        uut('5')
-        self.assertTrue(uut.is_valid())
-
-        uut('6')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expecting value less or equal to 5', uut.errors[0])
-
-    def test_valueRange(self):
-        uut = self.UUT(owner=self.entity, min_value=4, max_value=6)
-
-        uut('4')
-        self.assertTrue(uut.is_valid())
-
-        uut('5')
-        self.assertTrue(uut.is_valid())
-
-        uut('6')
-        self.assertTrue(uut.is_valid())
-
-        uut('3')
-        self.assertFalse(uut.is_valid())
-        self.assertEqual('Expecting value between 4 and 6', uut.errors[0])
 
 
 class TestRegex(unittest.TestCase):
@@ -251,52 +182,6 @@ class TestListOf(unittest.TestCase):
 
         uut([4])
         self.assertFalse(uut.is_valid())
-
-    def test_minLengthConstraint(self):
-        uut = formify.ListOf(formify.Integer, min_length=2, owner=self.Entity())
-
-        uut([1, 2])
-        self.assertTrue(uut.is_valid())
-
-        uut([1, 2, 3])
-        self.assertTrue(uut.is_valid())
-
-        uut([1])
-        self.assertFalse(uut.is_valid())
-        self.assertIn('Expecting at least 2 elements', uut.errors)
-
-    def test_maxLengthConstraint(self):
-        uut = formify.ListOf(formify.Integer, max_length=4, owner=self.Entity())
-
-        uut([1, 2, 3, 4])
-        self.assertTrue(uut.is_valid())
-
-        uut([1, 2, 3])
-        self.assertTrue(uut.is_valid())
-
-        uut([1, 2, 3, 4, 5])
-        self.assertFalse(uut.is_valid())
-        self.assertIn('Expecting at most 4 elements', uut.errors)
-
-    def test_lengthRangeConstraint(self):
-        uut = formify.ListOf(formify.Integer, min_length=2, max_length=4, owner=self.Entity())
-
-        uut([2, 2])
-        self.assertTrue(uut.is_valid())
-
-        uut([2, 2, 2])
-        self.assertTrue(uut.is_valid())
-
-        uut([2, 2, 2, 2])
-        self.assertTrue(uut.is_valid())
-
-        uut([2])
-        self.assertFalse(uut.is_valid())
-        self.assertIn('Expected number of elements is between 2 and 4', uut.errors)
-
-        uut([2, 2, 2, 2, 2])
-        self.assertFalse(uut.is_valid())
-        self.assertIn('Expected number of elements is between 2 and 4', uut.errors)
 
 
 class TestMap(unittest.TestCase):
