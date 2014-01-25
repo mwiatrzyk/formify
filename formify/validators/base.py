@@ -198,7 +198,7 @@ class Integer(Numeric):
         return int
 
 
-class ListOf(Validator, LengthValidatorMixin):
+class List(Validator, LengthValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
@@ -208,7 +208,7 @@ class ListOf(Validator, LengthValidatorMixin):
     })
 
     def __init__(self, validator, min_length=None, max_length=None, **kwargs):
-        super(ListOf, self).__init__(**kwargs)
+        super(List, self).__init__(**kwargs)
         self.validator = validator
         self.min_length = min_length
         self.max_length = max_length
@@ -229,7 +229,7 @@ class ListOf(Validator, LengthValidatorMixin):
         return list
 
     def process(self, value):
-        value = super(ListOf, self).process(value)
+        value = super(List, self).process(value)
         self._value_validators = self.__create_value_validators(value)
         for i, validator in enumerate(self._value_validators):
             value[i] = validator.value
@@ -244,7 +244,7 @@ class ListOf(Validator, LengthValidatorMixin):
         return validators
 
     def is_valid(self):
-        status = super(ListOf, self).is_valid()
+        status = super(List, self).is_valid()
         if not status:
             return False
         for v in self:

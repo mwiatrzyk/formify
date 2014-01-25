@@ -98,10 +98,10 @@ class TestRegex(unittest.TestCase):
         self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
 
 
-class TestListOf(unittest.TestCase):
+class TestList(unittest.TestCase):
 
     def setUp(self):
-        self.uut = formify.ListOf(formify.Integer, standalone=True)
+        self.uut = formify.List(formify.Integer, standalone=True)
 
     def test_ifUnableToConvertToList_conversionFails(self):
         self.uut(123)
@@ -150,7 +150,7 @@ class TestListOf(unittest.TestCase):
         self.assertFalse(self.uut[3].is_valid())
 
     def test_whenCheckingValidity_innerValidatorsAffectTheResult(self):
-        uut = formify.ListOf(formify.Integer(max_value=3), standalone=True)
+        uut = formify.List(formify.Integer(max_value=3), standalone=True)
 
         uut([3])
         self.assertTrue(uut.is_valid())
