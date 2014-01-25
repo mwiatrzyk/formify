@@ -149,9 +149,9 @@ class BaseString(Validator):
 class String(BaseString, LengthValidatorMixin):
     messages = dict(BaseString.messages)
     messages.update({
-        'too_short': 'Expecting at least %(min_length)s characters',
-        'too_long': 'Expecting at most %(max_length)s characters',
-        'length_out_of_range': 'Expected number of characters is between %(min_length)s and %(max_length)s'
+        'value_too_short': 'Expecting at least %(min_length)s characters',
+        'value_too_long': 'Expecting at most %(max_length)s characters',
+        'value_length_out_of_range': 'Expected number of characters is between %(min_length)s and %(max_length)s'
     })
 
     def __init__(self, min_length=None, max_length=None, **kwargs):
@@ -180,8 +180,8 @@ class Regex(BaseString):
 class Numeric(Validator, ValueValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({
-        'too_low': 'Expecting value greater or equal to %(min_value)s',
-        'too_high': 'Expecting value less or equal to %(max_value)s',
+        'value_too_low': 'Expecting value greater or equal to %(min_value)s',
+        'value_too_high': 'Expecting value less or equal to %(max_value)s',
         'value_out_of_range': 'Expecting value between %(min_value)s and %(max_value)s'
     })
 

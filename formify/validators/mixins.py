@@ -20,17 +20,17 @@ class LengthValidatorMixin(ValidatorMixin):
 
     def __validate_length_range(self, value):
         if not self.min_length <= len(value) <= self.max_length:
-            raise exc.ValidationError('length_out_of_range',
+            raise exc.ValidationError('value_length_out_of_range',
                 min_length=self.min_length,
                 max_length=self.max_length)
 
     def __validate_min_length(self, value):
         if len(value) < self.min_length:
-            raise exc.ValidationError('too_short', min_length=self.min_length)
+            raise exc.ValidationError('value_too_short', min_length=self.min_length)
 
     def __validate_max_length(self, value):
         if len(value) > self.max_length:
-            raise exc.ValidationError('too_long', max_length=self.max_length)
+            raise exc.ValidationError('value_too_long', max_length=self.max_length)
 
 
 class ValueValidatorMixin(ValidatorMixin):
@@ -51,8 +51,8 @@ class ValueValidatorMixin(ValidatorMixin):
 
     def __validate_min_value(self, value):
         if value < self.min_value:
-            raise exc.ValidationError('too_low', min_value=self.min_value)
+            raise exc.ValidationError('value_too_low', min_value=self.min_value)
 
     def __validate_max_value(self, value):
         if value > self.max_value:
-            raise exc.ValidationError('too_high', max_value=self.max_value)
+            raise exc.ValidationError('value_too_high', max_value=self.max_value)

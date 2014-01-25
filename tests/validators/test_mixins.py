@@ -10,9 +10,9 @@ class TestLengthValidatorMixin(unittest.TestCase):
         class UUT(Validator, mixins.LengthValidatorMixin):
             python_type = unicode
             messages = {
-                'too_short': 'Expecting at least %(min_length)s characters',
-                'too_long': 'Expecting at most %(max_length)s characters',
-                'length_out_of_range': 'Expecting number of characters between %(min_length)s and %(max_length)s'
+                'value_too_short': 'Expecting at least %(min_length)s characters',
+                'value_too_long': 'Expecting at most %(max_length)s characters',
+                'value_length_out_of_range': 'Expecting number of characters between %(min_length)s and %(max_length)s'
             }
 
             def __init__(self, min_length=None, max_length=None, **kwargs):
@@ -76,8 +76,8 @@ class TestValueValidatorMixin(unittest.TestCase):
         class UUT(Validator, mixins.ValueValidatorMixin):
             python_type = int
             messages = {
-                'too_low': 'Value must not be less than %(min_value)s',
-                'too_high': 'Value must not be greater than %(max_value)s',
+                'value_too_low': 'Value must not be less than %(min_value)s',
+                'value_too_high': 'Value must not be greater than %(max_value)s',
                 'value_out_of_range': 'Expecting value between %(min_value)s and %(max_value)s'
             }
 
