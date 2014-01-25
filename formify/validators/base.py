@@ -63,13 +63,19 @@ class Validator(ValidatorMixin):
         else:
             return object.__new__(cls, *args, **kwargs)
 
-    def __init__(self, key=None, required=True, default=None, owner=None, standalone=False):
+    def __init__(self, key=None, required=True, default=None, owner=None, standalone=False, messages=None):
         self.key = key
         self.required = required
         self.default = default
         self.owner = owner
         self.standalone = standalone
+        if messages is not None:
+            self.__update_messages(messages)
         self.process(default)
+
+    def __update_messages(self, messages):
+        self.messages = dict(self.__class__.messages)
+        self.messages.update(messages)
 
     def __call__(self, value):
         return self.process(value)
