@@ -35,7 +35,7 @@ class ISBNTestsMixin(object):
 class TestISBN10(unittest.TestCase, ISBNTestsMixin):
 
     def setUp(self):
-        self.uut = formify.ISBN10(standalone=True, messages=ISBNTestsMixin.messages)
+        self.uut = formify.ISBN10(standalone=True, messages=self.messages)
 
         self.valid = '81-7525-766-0'
         self.valid_int = 8175257660
@@ -46,7 +46,7 @@ class TestISBN10(unittest.TestCase, ISBNTestsMixin):
 class TestISBN13(unittest.TestCase, ISBNTestsMixin):
 
     def setUp(self):
-        self.uut = formify.ISBN13(standalone=True, messages=ISBNTestsMixin.messages)
+        self.uut = formify.ISBN13(standalone=True, messages=self.messages)
 
         self.valid = '978-81-7525-766-5'
         self.valid_int = 9788175257665
