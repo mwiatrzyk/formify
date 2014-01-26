@@ -1,4 +1,5 @@
 import re
+import decimal
 import weakref
 import collections
 
@@ -209,6 +210,13 @@ class Float(Numeric):
     @property
     def python_type(self):
         return float
+
+
+class Decimal(Numeric):
+
+    @property
+    def python_type(self):
+        return decimal.Decimal
 
 
 class List(Validator, LengthValidatorMixin):

@@ -1,3 +1,4 @@
+import decimal
 import unittest
 
 import formify
@@ -146,6 +147,19 @@ class TestFloat(unittest.TestCase, NumericTestsMixin):
             'too_low': {'raw_value': '3.14', 'value': 3.14, 'min_value': 3.5},
             'too_high': {'raw_value': '3.14', 'value': 3.14, 'max_value': 3},
             'not_in_range': {'raw_value': '3.14', 'value': 3.14, 'min_value': 3.2, 'max_value': 3.3}
+        }
+
+
+class TestDecimal(unittest.TestCase, NumericTestsMixin):
+
+    def setUp(self):
+        self.UUT = formify.Decimal
+        self.config = {
+            'successful_conversion': {'raw_value': '3.14', 'value': decimal.Decimal('3.14')},
+            'failed_conversion': {'raw_value': 'abc'},
+            'too_low': {'raw_value': '3.14', 'value': decimal.Decimal('3.14'), 'min_value': 3.5},
+            'too_high': {'raw_value': '3.14', 'value': decimal.Decimal('3.14'), 'max_value': 3},
+            'not_in_range': {'raw_value': '3.14', 'value': decimal.Decimal('3.14'), 'min_value': 3.2, 'max_value': 3.3}
         }
 
 
