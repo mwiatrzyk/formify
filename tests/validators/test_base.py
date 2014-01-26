@@ -61,22 +61,79 @@ class TestString(unittest.TestCase):
         self.assertEqual(u'123', uut.value)
 
 
-class TestNumeric(unittest.TestCase):
+class NumericTestsMixin(object):
+    messages = {
+        'conversion_error': 'Unable to convert',
+        'value_too_low': 'Value too low',
+        'value_too_high': 'Value too high',
+        'value_out_of_range': 'Value out of range'
+    }
+
+    def test_successfulConversion(self):
+        config = self.config['successful_conversion']
+        raw_value, value = config['raw_value'], config['value']
+        uut = self.UUT(standalone=True, messages=self.messages)
+
+        uut(raw_value)
+
+        self.assertIsInstance(uut.value, uut.python_type)
+        self.assertEqual(value, uut.value)
+
+    def test_failedConversion(self):
+        config = self.config['failed_conversion']
+        raw_value = config['raw_value']
+        uut = self.UUT(standalone=True, messages=self.messages)
+
+        uut(raw_value)
+
+        self.assertIs(uut.value, None)
+        self.assertIn('Unable to convert', uut.errors)
+
+    def test_whenTooLowGiven_validationFails(self):
+        config = self.config['too_low']
+        raw_value, value, min_value = config['raw_value'], config['value'], config['min_value']
+        uut = self.UUT(min_value=min_value, standalone=True, messages=self.messages)
+
+        uut(raw_value)
+
+        self.assertEqual(value, uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Value too low', uut.errors)
+
+    def test_whenTooHighGiven_validationFails(self):
+        config = self.config['too_high']
+        raw_value, value, max_value = config['raw_value'], config['value'], config['max_value']
+        uut = self.UUT(max_value=max_value, standalone=True, messages=self.messages)
+
+        uut(raw_value)
+
+        self.assertEqual(value, uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Value too high', uut.errors)
+
+    def test_whenNotInRange_validationFails(self):
+        config = self.config['not_in_range']
+        raw_value, value, min_value, max_value = config['raw_value'], config['value'], config['min_value'], config['max_value']
+        uut = self.UUT(min_value=min_value, max_value=max_value, standalone=True, messages=self.messages)
+
+        uut(raw_value)
+
+        self.assertEqual(value, uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Value out of range', uut.errors)
+
+
+class TestInteger(unittest.TestCase, NumericTestsMixin):
 
     def setUp(self):
-
-        class UUT(formify.Numeric):
-            python_type = int
-
-        self.UUT = UUT
-
-    def test_conversion(self):
-        uut = self.UUT(standalone=True)
-
-        uut('123')
-
-        self.assertIsInstance(uut.value, int)
-        self.assertEqual(123, uut.value)
+        self.UUT = formify.Integer
+        self.config = {
+            'successful_conversion': {'raw_value': '123', 'value': 123},
+            'failed_conversion': {'raw_value': 'abc'},
+            'too_low': {'raw_value': '5', 'value': 5, 'min_value': 6},
+            'too_high': {'raw_value': '5', 'value': 5, 'max_value': 4},
+            'not_in_range': {'raw_value': '5', 'value': 5, 'min_value': 6, 'max_value': 7}
+        }
 
 
 class TestRegex(unittest.TestCase):
