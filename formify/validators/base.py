@@ -204,6 +204,13 @@ class Integer(Numeric):
         return int
 
 
+class Float(Numeric):
+
+    @property
+    def python_type(self):
+        return float
+
+
 class List(Validator, LengthValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({
