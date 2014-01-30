@@ -219,6 +219,48 @@ class Decimal(Numeric):
         return decimal.Decimal
 
 
+class AnyOf(Validator):
+
+    def __init__(self, validators, **kwargs):
+        self.validators = validators
+        super(AnyOf, self).__init__(**kwargs)
+
+    def process(self, value):
+        self.raw_value = value
+        self._index_of_current = -1
+        self._bound_validators = [x(owner=self) for x in self.validators]
+        for i, validator in enumerate(self._bound_validators):
+            if validator.process(value) is not None:
+                self._index_of_current = i
+                return self.value
+
+    def try_validate(self, value):
+        for i in xrange(self._index_of_current, len(self._bound_validators)):
+            validator = self._bound_validators[i]
+            if validator.process(value) is not None:
+                if validator.is_valid():
+                    self._index_of_current = i
+                    return True
+        else:
+            return False
+
+    @property
+    def validator(self):
+        return self._bound_validators[self._index_of_current]
+
+    @property
+    def errors(self):
+        return self.validator.errors
+
+    @property
+    def value(self):
+        return self.validator.value
+
+    @property
+    def python_type(self):
+        return self.validator.python_type
+
+
 class List(Validator, LengthValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({

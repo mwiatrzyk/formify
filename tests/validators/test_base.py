@@ -182,6 +182,59 @@ class TestRegex(unittest.TestCase):
         self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
 
 
+class TestAnyOf(unittest.TestCase):
+
+    def setUp(self):
+        self.uut = formify.AnyOf([
+            formify.Integer(min_value=1),
+            formify.Float], standalone=True)
+
+    def test_initialState(self):
+        self.assertIsInstance(self.uut.validator, self.uut.validators[-1])
+        self.assertIs(self.uut.value, None)
+        self.assertIs(self.uut.raw_value, None)
+        self.assertFalse(self.uut.errors)
+
+    def test_whenProcessingValue_firstValidatorThatSuccessfulyProcessesItIsUsed(self):
+        self.uut('3.14')
+
+        self.assertIsInstance(self.uut.validator, formify.Float)
+        self.assertIs(self.uut.python_type, float)
+        self.assertEqual(3.14, self.uut.value)
+
+        self.uut('1')
+
+        self.assertIsInstance(self.uut.validator, formify.Integer)
+        self.assertIs(self.uut.python_type, int)
+        self.assertEqual(1, self.uut.value)
+
+    def test_whenNoValidatorCouldProcessValue_processingFails(self):
+        self.uut('abc')
+
+        self.assertIs(self.uut.value, None)
+        self.assertIsInstance(self.uut.validator, formify.Float)
+        self.assertFalse(self.uut.is_valid())
+        self.assertTrue(self.uut.errors)
+
+    def test_whenProcessingValidValueAfterInvalidOne_validatorIsAssigned(self):
+        self.uut('abc')
+        self.assertIsInstance(self.uut.validator, formify.Float)
+
+        self.uut('1')
+        self.assertIsInstance(self.uut.validator, formify.Integer)
+
+    def test_whenValidationFailsForCurrentValidator_validatorIsChanged(self):
+        self.uut('-1')
+
+        self.assertIsInstance(self.uut.validator, formify.Integer)
+        self.assertEqual(-1, self.uut.value)
+
+        self.assertTrue(self.uut.is_valid())
+
+        self.assertIsInstance(self.uut.validator, formify.Float)
+        self.assertEqual(-1.0, self.uut.value)
+
+
 class TestList(unittest.TestCase):
 
     def setUp(self):
