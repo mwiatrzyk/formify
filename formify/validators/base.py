@@ -261,6 +261,79 @@ class AnyOf(Validator):
         return self.validator.python_type
 
 
+class BaseEnum(Validator):
+
+    def __init__(self, options, key_type=str, **kwargs):
+        super(BaseEnum, self).__init__(**kwargs)
+        self.options = options
+        self.key_type = key_type
+
+    @property
+    def options(self):
+        return self._options
+
+    @options.setter
+    def options(self, value):
+        self._options = collections.OrderedDict(value)
+
+
+class Enum(BaseEnum):
+    messages = dict(Validator.messages)
+    messages.update({
+        'invalid_option': 'Invalid option: %(key)s'
+    })
+
+    def validate(self, value):
+        super(Enum, self).validate(value)
+        if value not in self.options:
+            raise exc.ValidationError('invalid_option', key=value)
+
+    @property
+    def python_type(self):
+        return self.key_type
+
+
+class MultiEnum(BaseEnum):
+    messages = dict(Validator.messages)
+    messages.update({
+        'invalid_options': 'Invalid options: %(keys)s',
+        'key_conversion_error': 'Unable to convert %(key)r to %(key_type)r object'
+    })
+
+    def try_convert(self, value):
+        value = super(MultiEnum, self).try_convert(value)
+        if value is None:
+            return value
+        result = self.python_type()
+        for v in value:
+            result.add(self.__try_convert_key(v))
+        return result
+
+    def __try_convert_key(self, key):
+        try:
+            return self.__convert_key(key)
+        except exc.ConversionError, e:
+            self.add_error(e.message_id, **e.params)
+
+    def __convert_key(self, key):
+        try:
+            return self.key_type(key)
+        except Exception, e:
+            raise exc.ConversionError('key_conversion_error',
+                key=key, key_type=self.key_type)
+
+    def validate(self, value):
+        super(MultiEnum, self).validate(value)
+        common_options = set(self.options).intersection(value)
+        if common_options != value:
+            raise exc.ValidationError('invalid_options',
+                keys=value.difference(common_options))
+
+    @property
+    def python_type(self):
+        return set
+
+
 class List(Validator, LengthValidatorMixin):
     messages = dict(Validator.messages)
     messages.update({

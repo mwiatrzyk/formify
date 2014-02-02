@@ -1,5 +1,6 @@
 import decimal
 import unittest
+import collections
 
 import formify
 
@@ -233,6 +234,104 @@ class TestAnyOf(unittest.TestCase):
 
         self.assertIsInstance(self.uut.validator, formify.Float)
         self.assertEqual(-1.0, self.uut.value)
+
+
+class TestBaseEnum(unittest.TestCase):
+
+    def test_createWithDictAsOptions(self):
+        uut = formify.BaseEnum({1: 'One'}, standalone=True)
+        self.assertIsInstance(uut.options, collections.OrderedDict)
+        self.assertEqual({1: 'One'}, uut.options)
+
+    def test_createWithListOfTuplesAsOptions(self):
+        uut = formify.BaseEnum([(1, 'One')], standalone=True)
+        self.assertIsInstance(uut.options, collections.OrderedDict)
+        self.assertEqual({1: 'One'}, uut.options)
+
+    def test_createWithOrderedDictAsOptions(self):
+        uut = formify.BaseEnum(collections.OrderedDict({1: 'One'}), standalone=True)
+        self.assertIsInstance(uut.options, collections.OrderedDict)
+        self.assertEqual({1: 'One'}, uut.options)
+
+
+class TestEnum(unittest.TestCase):
+    options = {
+        1: 'One',
+        2: 'Two'
+    }
+
+    def test_validInputData(self):
+        uut = formify.Enum(self.options, key_type=int, standalone=True)
+
+        self.assertIs(uut.python_type, int)
+
+        uut('1')
+        self.assertEqual(1, uut.value)
+        self.assertTrue(uut.is_valid())
+
+        uut(2)
+        self.assertEqual(2, uut.value)
+        self.assertTrue(uut.is_valid())
+
+    def test_invalidInputData(self):
+        uut = formify.Enum(self.options, key_type=int, standalone=True)
+
+        uut('3')
+        self.assertEqual(3, uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Invalid option: 3', uut.errors)
+
+
+class TestMultiEnum(unittest.TestCase):
+    options = {
+        1: 'One',
+        2: 'Two',
+        3: 'Thre'
+    }
+
+    def test_validInputData(self):
+        uut = formify.MultiEnum(self.options, key_type=int, standalone=True)
+
+        uut('1')
+        self.assertEqual(set([1]), uut.value)
+        self.assertTrue(uut.is_valid())
+
+        uut('13')
+        self.assertEqual(set([1, 3]), uut.value)
+        self.assertTrue(uut.is_valid())
+
+        uut([1, 2, 3])
+        self.assertEqual(set([1, 2, 3]), uut.value)
+        self.assertTrue(uut.is_valid())
+
+    def test_invalidInputData(self):
+        uut = formify.MultiEnum(self.options, key_type=int, standalone=True)
+
+        uut(1)
+        self.assertIs(uut.value, None)
+        self.assertFalse(uut.is_valid())
+
+        uut('4')
+        self.assertEqual(set([4]), uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Invalid options: set([4])', uut.errors)
+
+        uut('a')
+        self.assertEqual(set([None]), uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'a' to <type 'int'> object", uut.errors)
+
+        uut('ab')
+        self.assertEqual(set([None]), uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'a' to <type 'int'> object", uut.errors)
+        self.assertIn("Unable to convert 'b' to <type 'int'> object", uut.errors)
+
+        uut('ab12')
+        self.assertEqual(set([None, 1, 2]), uut.value)
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'a' to <type 'int'> object", uut.errors)
+        self.assertIn("Unable to convert 'b' to <type 'int'> object", uut.errors)
 
 
 class TestList(unittest.TestCase):
