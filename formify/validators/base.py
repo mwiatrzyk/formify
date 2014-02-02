@@ -52,7 +52,7 @@ class UnboundValidator(object):
 
 class Validator(ValidatorMixin):
     messages = {
-        'conversion_error': 'Unable to convert to value of type %(python_type)r: %(exc)s',
+        'conversion_error': 'Unable to convert %(value)r to %(python_type)r object',
         'required_error': 'This field is required'
     }
 
@@ -95,7 +95,7 @@ class Validator(ValidatorMixin):
             return self.python_type(value)
         except Exception, e:
             raise exc.ConversionError('conversion_error',
-                value=value, python_type=self.python_type, exc=e)
+                value=value, python_type=self.python_type)
 
     def try_convert(self, value):
         try:
@@ -217,6 +217,44 @@ class Decimal(Numeric):
     @property
     def python_type(self):
         return decimal.Decimal
+
+
+class Boolean(Validator):
+    trues = set(['1', 'y', 'yes', 'on', 'true'])
+    falses = set(['0', 'n', 'no', 'off', 'false'])
+
+    def __init__(self, trues=None, falses=None, **kwargs):
+        super(Boolean, self).__init__(**kwargs)
+        if trues is not None:
+            self.trues = set(trues)
+        if falses is not None:
+            self.falses = set(falses)
+
+    def convert(self, value):
+        if isinstance(value, basestring):
+            return self.__convert_string(value)
+        else:
+            return self.__convert_non_string(value)
+
+    def __convert_non_string(self, value):
+        try:
+            return bool(value)
+        except Exception, e:
+            raise exc.ConversionError('conversion_error',
+                value=value, python_type=self.python_type)
+
+    def __convert_string(self, value):
+        if value in self.trues:
+            return True
+        elif value in self.falses:
+            return False
+        else:
+            raise exc.ConversionError('conversion_error',
+                value=value, python_type=self.python_type)
+
+    @property
+    def python_type(self):
+        return bool
 
 
 class AnyOf(Validator):

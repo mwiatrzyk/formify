@@ -63,6 +63,25 @@ class TestString(unittest.TestCase):
         self.assertEqual(u'123', uut.value)
 
 
+class TestRegex(unittest.TestCase):
+
+    def setUp(self):
+        self.uut = formify.Regex(r'^[0-9]+$', standalone=True)
+
+    def test_whenValueMatchesPattern_validationSucceeds(self):
+        self.uut('123')
+
+        self.assertTrue(self.uut.is_valid())
+        self.assertEqual('123', self.uut.value)
+
+    def test_whenValueDoesNotMatchPattern_validationFails(self):
+        self.uut('0x123')
+
+        self.assertFalse(self.uut.is_valid())
+        self.assertEqual('0x123', self.uut.value)
+        self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
+
+
 class NumericTestsMixin(object):
     messages = {
         'conversion_error': 'Unable to convert',
@@ -164,23 +183,47 @@ class TestDecimal(unittest.TestCase, NumericTestsMixin):
         }
 
 
-class TestRegex(unittest.TestCase):
+class TestBoolean(unittest.TestCase):
 
-    def setUp(self):
-        self.uut = formify.Regex(r'^[0-9]+$', standalone=True)
+    def test_customTruesAndFalses(self):
+        uut = formify.Boolean(trues='y', falses='n', standalone=True)
 
-    def test_whenValueMatchesPattern_validationSucceeds(self):
-        self.uut('123')
+        self.assertIs(uut('y'), True)
+        self.assertIs(uut('n'), False)
 
-        self.assertTrue(self.uut.is_valid())
-        self.assertEqual('123', self.uut.value)
+        self.assertIs(uut('Y'), None)
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'Y' to <type 'bool'> object", uut.errors)
 
-    def test_whenValueDoesNotMatchPattern_validationFails(self):
-        self.uut('0x123')
+        self.assertIs(uut('N'), None)
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'N' to <type 'bool'> object", uut.errors)
 
-        self.assertFalse(self.uut.is_valid())
-        self.assertEqual('0x123', self.uut.value)
-        self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
+    def test_validInputData(self):
+        uut = formify.Boolean(standalone=True)
+
+        self.assertIs(uut('1'), True)
+        self.assertIs(uut(1), True)
+        self.assertIs(uut('y'), True)
+        self.assertIs(uut('yes'), True)
+        self.assertIs(uut('on'), True)
+        self.assertIs(uut('true'), True)
+        self.assertIs(uut(True), True)
+
+        self.assertIs(uut('0'), False)
+        self.assertIs(uut(0), False)
+        self.assertIs(uut('n'), False)
+        self.assertIs(uut('no'), False)
+        self.assertIs(uut('off'), False)
+        self.assertIs(uut('false'), False)
+        self.assertIs(uut(False), False)
+
+    def test_invalidInputData(self):
+        uut = formify.Boolean(standalone=True)
+
+        uut('yes or no')
+        self.assertFalse(uut.is_valid())
+        self.assertIn("Unable to convert 'yes or no' to <type 'bool'> object", uut.errors)
 
 
 class TestAnyOf(unittest.TestCase):
