@@ -1,9 +1,11 @@
 import re
 import decimal
 import weakref
+import datetime
 import collections
 
 from formify import _utils, exc
+from formify.decorators import message_formatter
 from formify.validators.mixins import (
     ValidatorMixin, LengthValidatorMixin, ValueValidatorMixin)
 
@@ -50,7 +52,20 @@ class UnboundValidator(object):
         return self._kwargs
 
 
+class ValidatorMeta(type):
+
+    @property
+    def __message_formatters__(cls):
+        formatters = {}
+        for name in dir(cls):
+            value = getattr(cls, name)
+            for key in getattr(value, '_ffy_message_formatter_keys', []):
+                formatters[key] = value
+        return formatters
+
+
 class Validator(ValidatorMixin):
+    __metaclass__ = ValidatorMeta
     messages = {
         'conversion_error': 'Unable to convert %(value)r to %(python_type)r object',
         'required_error': 'This field is required'
@@ -86,8 +101,10 @@ class Validator(ValidatorMixin):
         self.raw_value = value
         if value is None:
             value = self.value = None
-        else:
+        elif not isinstance(value, self.python_type):
             value = self.value = self.try_convert(value)
+        else:
+            self.value = value
         return value
 
     def convert(self, value):
@@ -124,7 +141,11 @@ class Validator(ValidatorMixin):
             return True
 
     def add_error(self, message_id, **params):
-        message = self.messages[message_id] % params
+        formatter = self.__class__.__message_formatters__.get(message_id)
+        if formatter is not None:
+            message = formatter(self, message_id, **params)
+        else:
+            message = self.messages[message_id] % params
         self.errors.append(message)
 
     @property
@@ -255,6 +276,53 @@ class Boolean(Validator):
     @property
     def python_type(self):
         return bool
+
+
+class DateTime(Validator, ValueValidatorMixin):
+    messages = dict(Validator.messages)
+    messages.update({
+        'conversion_error': 'Input date/time does not match format %(fmt)s',
+        'invalid_input': 'Can only parse strings',
+        'value_too_low': 'Minimal date is %(min_value)s',
+        'value_too_high': 'Maximal date is %(max_value)s',
+        'value_out_of_range': 'Expecting date between %(min_value)s and %(max_value)s'
+    })
+
+    @message_formatter('value_too_low', 'value_too_high', 'value_out_of_range')
+    def _format_date_time(self, message_id, min_value=None, max_value=None):
+        if min_value is not None:
+            min_value = self.__to_string(min_value)
+        if max_value is not None:
+            max_value = self.__to_string(max_value)
+        return self.messages[message_id] % {
+            'min_value': min_value,
+            'max_value': max_value}
+
+    def __to_string(self, value):
+        return datetime.datetime.strftime(value, self.fmt)
+
+    def __init__(self, fmt, min_value=None, max_value=None, **kwargs):
+        super(DateTime, self).__init__(**kwargs)
+        self.fmt = fmt
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def convert(self, value):
+        if not isinstance(value, basestring):
+            raise exc.ConversionError('invalid_input')
+        else:
+            return self.__from_string(value)
+
+    def __from_string(self, value):
+        try:
+            return datetime.datetime.strptime(value, self.fmt)
+        except ValueError:
+            raise exc.ConversionError('conversion_error',
+                value=value, python_type=self.python_type, fmt=self.fmt)
+
+    @property
+    def python_type(self):
+        return datetime.datetime
 
 
 class AnyOf(Validator):

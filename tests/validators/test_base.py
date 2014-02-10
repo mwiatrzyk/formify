@@ -1,5 +1,6 @@
 import decimal
 import unittest
+import datetime
 import collections
 
 import formify
@@ -224,6 +225,82 @@ class TestBoolean(unittest.TestCase):
         uut('yes or no')
         self.assertFalse(uut.is_valid())
         self.assertIn("Unable to convert 'yes or no' to <type 'bool'> object", uut.errors)
+
+
+class TestDateTime(unittest.TestCase):
+
+    def setUp(self):
+        self.uut = formify.DateTime('%Y-%m-%d %H:%M:%S', standalone=True)
+
+    def test_parseFromStringThatMatchesPattern(self):
+        self.uut('2000-01-01 07:30:59')
+
+        self.assertEqual(datetime.datetime(2000, 1, 1, 7, 30, 59), self.uut.value)
+
+    def test_parseFromStringThatDoesNotMatchPattern(self):
+        self.uut('2000-01-01')
+
+        self.assertIs(self.uut.value, None)
+        self.assertIn('Input date/time does not match format %Y-%m-%d %H:%M:%S', self.uut.errors)
+
+    def test_parseFromNonString(self):
+        self.uut(123)
+
+        self.assertIs(self.uut.value, None)
+        self.assertIn('Can only parse strings', self.uut.errors)
+
+    def test_parseFromObjectOfSameType(self):
+        date = datetime.datetime(2000, 1, 1)
+
+        self.uut(date)
+
+        self.assertIs(self.uut.value, date)
+
+    def test_minDateConstraint(self):
+        uut = formify.DateTime('%Y-%m-%d', min_value=datetime.datetime(2000, 1, 1), standalone=True)
+
+        uut('2000-01-01')
+        self.assertTrue(uut.is_valid())
+
+        uut('2000-01-02')
+        self.assertTrue(uut.is_valid())
+
+        uut('1999-12-31')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Minimal date is 2000-01-01', uut.errors)
+
+    def test_maxDateConstraint(self):
+        uut = formify.DateTime('%Y-%m-%d', max_value=datetime.datetime(2000, 1, 1), standalone=True)
+
+        uut('1999-12-31')
+        self.assertTrue(uut.is_valid())
+
+        uut('2000-01-01')
+        self.assertTrue(uut.is_valid())
+
+        uut('2000-01-02')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Maximal date is 2000-01-01', uut.errors)
+
+    def test_dateRangeConstraint(self):
+        uut = formify.DateTime('%Y-%m-%d', min_value=datetime.datetime(2000, 1, 1), max_value=datetime.datetime(2000, 12, 31), standalone=True)
+
+        uut('2000-01-01')
+        self.assertTrue(uut.is_valid())
+
+        uut('2000-06-01')
+        self.assertTrue(uut.is_valid())
+
+        uut('2000-12-12')
+        self.assertTrue(uut.is_valid())
+
+        uut('1999-12-31')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expecting date between 2000-01-01 and 2000-12-31', uut.errors)
+
+        uut('2001-01-01')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expecting date between 2000-01-01 and 2000-12-31', uut.errors)
 
 
 class TestAnyOf(unittest.TestCase):
