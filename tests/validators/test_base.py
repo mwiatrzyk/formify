@@ -454,6 +454,33 @@ class TestMultiEnum(unittest.TestCase):
         self.assertIn("Unable to convert 'b' to <type 'int'> object", uut.errors)
 
 
+class TestEqualTo(unittest.TestCase):
+
+    def setUp(self):
+        self.uut = formify.Map({
+            'a': formify.DateTime('%Y-%m-%d'),
+            'b': formify.EqualTo('a')}, standalone=True)
+
+    def test_doNotAllowStandaloneVersion(self):
+        with self.assertRaises(TypeError):
+            uut = formify.EqualTo('bar', standalone=True)
+
+    def test_ifEqual_validationSucceeds(self):
+        self.uut({'a': '2000-01-01', 'b': '2000-01-01'})
+
+        self.assertIsInstance(self.uut['b'].validator, formify.DateTime)
+        self.assertTrue(self.uut.is_valid())
+        self.assertIs(self.uut['b'].python_type, self.uut['a'].python_type)
+        self.assertEqual(self.uut['b'].value, self.uut['a'].value)
+
+    def test_ifNotEqual_validationFails(self):
+        self.uut({'a': '2000-01-01', 'b': '2000-02-02'})
+
+        self.assertFalse(self.uut.is_valid())
+        self.assertNotEqual(self.uut['b'].value, self.uut['a'].value)
+        self.assertIn('Values are not equal', self.uut['b'].errors)
+
+
 class TestList(unittest.TestCase):
 
     def setUp(self):

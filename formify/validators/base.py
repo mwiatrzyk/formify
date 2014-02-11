@@ -140,12 +140,15 @@ class Validator(ValidatorMixin):
         else:
             return True
 
-    def add_error(self, message_id, **params):
+    def format_message(self, message_id, **params):
         formatter = self.__class__.__message_formatters__.get(message_id)
         if formatter is not None:
-            message = formatter(self, message_id, **params)
+            return formatter(self, message_id, **params)
         else:
-            message = self.messages[message_id] % params
+            return self.messages[message_id] % params
+
+    def add_error(self, message_id, **params):
+        message = self.format_message(message_id, **params)
         self.errors.append(message)
 
     @property
@@ -438,6 +441,42 @@ class MultiEnum(BaseEnum):
     @property
     def python_type(self):
         return set
+
+
+class EqualTo(Validator):
+    messages = dict(Validator.messages)
+    messages.update({
+        'not_equal': 'Values are not equal'
+    })
+
+    def __init__(self, key, **kwargs):
+        if 'owner' not in kwargs:
+            raise TypeError("owner is required for %r validator" % self.__class__)
+        super(EqualTo, self).__init__(**kwargs)
+        self.key = key
+
+    def try_convert(self, value):
+        try:
+            return self.validator.convert(value)
+        except exc.ConversionError, e:
+            self.__add_external_error(e.message_id, **e.params)
+
+    def __add_external_error(self, message_id, **params):
+        message = self.validator.format_message(message_id, **params)
+        self.errors.append(message)
+
+    def validate(self, value):
+        super(EqualTo, self).validate(value)
+        if self.value != self.validator.value:
+            raise exc.ValidationError('not_equal')
+
+    @property
+    def validator(self):
+        return self.owner[self.key]
+
+    @property
+    def python_type(self):
+        return self.validator.python_type
 
 
 class List(Validator, LengthValidatorMixin):
