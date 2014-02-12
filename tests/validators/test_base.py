@@ -303,6 +303,43 @@ class TestDateTime(unittest.TestCase):
         self.assertIn('Expecting date between 2000-01-01 and 2000-12-31', uut.errors)
 
 
+class TestPassword(unittest.TestCase):
+
+    def test_hashIsProducedAsOutput(self):
+        uut = formify.Password(standalone=True)
+
+        uut('A')
+
+        self.assertTrue(uut.is_valid())
+        self.assertEqual('A', uut.raw_value)
+        self.assertEqual('6dcd4ce23d88e2ee9568ba546c007c63d9131c1b', uut.value)
+
+    def test_passwordTooShort(self):
+        uut = formify.Password(min_length=4, max_length=8, standalone=True)
+
+        uut('A')
+
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expected number of characters is between 4 and 8', uut.errors)
+
+    def test_passwordTooLong(self):
+        uut = formify.Password(min_length=4, max_length=8, standalone=True)
+
+        uut('ABCDEFGHI')
+
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Expected number of characters is between 4 and 8', uut.errors)
+
+    def test_passwordCorrect(self):
+        uut = formify.Password(min_length=4, max_length=8, standalone=True)
+
+        uut('ABCD')
+        self.assertTrue(uut.is_valid())
+
+        uut('ABCDEFGH')
+        self.assertTrue(uut.is_valid())
+
+
 class TestAnyOf(unittest.TestCase):
 
     def setUp(self):

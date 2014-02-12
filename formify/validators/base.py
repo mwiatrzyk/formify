@@ -1,4 +1,5 @@
 import re
+import hashlib
 import decimal
 import weakref
 import datetime
@@ -326,6 +327,26 @@ class DateTime(Validator, ValueValidatorMixin):
     @property
     def python_type(self):
         return datetime.datetime
+
+
+class Password(String):
+
+    def __init__(self, hash_algorithm='sha1', **kwargs):
+        super(Password, self).__init__(**kwargs)
+        self.hash_algorithm = hash_algorithm
+
+    def convert(self, value):
+        value = super(Password, self).convert(value)
+        self._converted_value = value
+        return self.__create_hash(value)
+
+    def __create_hash(self, value):
+        hash_obj = hashlib.new(self.hash_algorithm)
+        hash_obj.update(value)
+        return hash_obj.hexdigest()
+
+    def validate(self, value):
+        super(Password, self).validate(self._converted_value)
 
 
 class AnyOf(Validator):
