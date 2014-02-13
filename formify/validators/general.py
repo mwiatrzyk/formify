@@ -9,9 +9,9 @@ from formify.decorators import message_formatter
 from formify.validators.base import Validator
 from formify.validators.mixins import LengthValidatorMixin, ValueValidatorMixin
 
-__all__ = ['BaseString', 'String', 'Regex', 'Numeric', 'Integer', 'Float',
-    'Decimal', 'Boolean', 'DateTime', 'Password', 'AnyOf', 'BaseEnum', 'Enum',
-    'MultiEnum', 'EqualTo', 'List', 'Map']
+__all__ = ['BaseString', 'String', 'Regex', 'URL', 'Numeric', 'Integer',
+    'Float', 'Decimal', 'Boolean', 'DateTime', 'Password', 'AnyOf', 'BaseEnum',
+    'Enum', 'MultiEnum', 'EqualTo', 'List', 'Map']
 
 
 class BaseString(Validator):
@@ -50,6 +50,16 @@ class Regex(BaseString):
     def validate(self, value):
         if not self._compiled_pattern.match(value):
             raise exc.ValidationError('pattern_mismatch', pattern=self.pattern)
+
+
+class URL(Regex):
+    messages = dict(Regex.messages)
+    messages.update({
+        'pattern_mismatch': 'Invalid URL'
+    })
+
+    def __init__(self, **kwargs):
+        super(URL, self).__init__(r'^((http|https|ftp)\://)?([a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,3}(/\S*)?$', **kwargs)
 
 
 class Numeric(Validator, ValueValidatorMixin):

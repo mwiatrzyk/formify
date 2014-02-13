@@ -36,6 +36,40 @@ class TestRegex(unittest.TestCase):
         self.assertEqual('Value does not match pattern ^[0-9]+$', self.uut.errors[0])
 
 
+class TestURL(unittest.TestCase):
+
+    def test_ifValidUrlGiven_validationSucceeds(self):
+        uut = formify.URL(standalone=True)
+
+        uut('http://www.example.com/foo/bar/baz.html')
+        self.assertTrue(uut.is_valid())
+
+        uut('https://example.com')
+        self.assertTrue(uut.is_valid())
+
+        uut('ftp://example.com/foo.txt')
+        self.assertTrue(uut.is_valid())
+
+        uut('www.example.com')
+        self.assertTrue(uut.is_valid())
+
+    def test_ifInvalidUrlGiven_validationFails(self):
+        uut = formify.URL(standalone=True)
+
+        uut('foo')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Invalid URL', uut.errors)
+
+        uut('http:/example')
+        self.assertFalse(uut.is_valid())
+
+        uut('http://www.example..com')
+        self.assertFalse(uut.is_valid())
+
+        uut('http://example')
+        self.assertFalse(uut.is_valid())
+
+
 class NumericTestsMixin(object):
     messages = {
         'conversion_error': 'Unable to convert',
