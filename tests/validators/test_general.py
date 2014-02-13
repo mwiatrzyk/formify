@@ -58,7 +58,7 @@ class TestURL(unittest.TestCase):
 
         uut('foo')
         self.assertFalse(uut.is_valid())
-        self.assertIn('Invalid URL', uut.errors)
+        self.assertIn('Invalid URL address', uut.errors)
 
         uut('http:/example')
         self.assertFalse(uut.is_valid())
@@ -67,6 +67,37 @@ class TestURL(unittest.TestCase):
         self.assertFalse(uut.is_valid())
 
         uut('http://example')
+        self.assertFalse(uut.is_valid())
+
+
+class TestEmail(unittest.TestCase):
+
+    def test_ifValidEmailGiven_validationSucceeds(self):
+        uut = formify.Email(standalone=True)
+
+        uut('foo@bar.baz')
+        self.assertTrue(uut.is_valid())
+
+        uut('john.doe@foo.bar.baz')
+        self.assertTrue(uut.is_valid())
+
+    def test_ifInvalidEmailGiven_validationFails(self):
+        uut = formify.Email(standalone=True)
+
+        uut('spam')
+        self.assertFalse(uut.is_valid())
+        self.assertIn('Invalid e-mail address', uut.errors)
+
+        uut('foo@@bar.baz')
+        self.assertFalse(uut.is_valid())
+
+        uut('foo@bar')
+        self.assertFalse(uut.is_valid())
+
+        uut('foo@bar..baz')
+        self.assertFalse(uut.is_valid())
+
+        uut('foo@bar.baz.spaaam')
         self.assertFalse(uut.is_valid())
 
 
