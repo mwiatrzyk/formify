@@ -1,5 +1,5 @@
 from formify import exc
-from formify.validators.base import Regex
+from formify.validators.general import Regex
 
 
 class BaseISBN(Regex):
