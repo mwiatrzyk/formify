@@ -1,4 +1,4 @@
-# formify/entity.py
+# formify/schema.py
 #
 # Copyright (C) 2014 Maciej Wiatrzyk
 #
@@ -11,7 +11,7 @@ from formify import _utils
 from formify.validators import UnboundValidator
 
 
-class EntityMeta(type):
+class SchemaMeta(type):
 
     @property
     def __validators__(cls):
@@ -28,8 +28,8 @@ class EntityMeta(type):
         return collections.OrderedDict(attrs)
 
 
-class Entity(object):
-    __metaclass__ = EntityMeta
+class Schema(object):
+    __metaclass__ = SchemaMeta
 
     def __init__(self, **kwargs):
         for k, v in kwargs.iteritems():
@@ -44,7 +44,7 @@ class Entity(object):
 
     def __setattr__(self, name, value):
         if name.startswith('_'):
-            super(Entity, self).__setattr__(name, value)
+            super(Schema, self).__setattr__(name, value)
         elif name not in self:
             raise AttributeError("unable to set attribute: %s" % name)
         else:
@@ -52,7 +52,7 @@ class Entity(object):
 
     def __getattribute__(self, name):
         if name.startswith('_') or name not in self:
-            value = super(Entity, self).__getattribute__(name)
+            value = super(Schema, self).__getattribute__(name)
             if isinstance(value, UnboundValidator):
                 raise AttributeError("unable to get attribute: %s" % name)
             return value

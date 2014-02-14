@@ -608,15 +608,15 @@ class TestMap(unittest.TestCase):
 
     def setUp(self):
 
-        class Entity(formify.Entity):
+        class Schema(formify.Schema):
             a = formify.Integer()
             b = formify.String()
 
-        self.Entity = Entity
-        self.uut = formify.Map(self.Entity, standalone=True)
+        self.Schema = Schema
+        self.uut = formify.Map(self.Schema, standalone=True)
 
     def test_createFromEntity(self):
-        uut = formify.Map(self.Entity, standalone=True)
+        uut = formify.Map(self.Schema, standalone=True)
 
         uut({'a': '1', 'b': 2})
 

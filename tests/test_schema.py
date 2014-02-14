@@ -1,4 +1,4 @@
-# tests/test_entity.py
+# tests/test_schema.py
 #
 # Copyright (C) 2014 Maciej Wiatrzyk
 #
@@ -10,11 +10,11 @@ import unittest
 import formify
 
 
-class TestEntity(unittest.TestCase):
+class TestSchema(unittest.TestCase):
 
     def setUp(self):
 
-        class UUT(formify.Entity):
+        class UUT(formify.Schema):
             a = formify.String()
             b = formify.Integer()
             _c = formify.Integer(key='c')
@@ -68,7 +68,7 @@ class TestEntity(unittest.TestCase):
 
     def test_whenDefaultValueSpecified_gettingThatPropertyReturnsItsDefaultValue(self):
 
-        class UUT(formify.Entity):
+        class UUT(formify.Schema):
             a = formify.Integer(default=123)
 
         uut = UUT()
