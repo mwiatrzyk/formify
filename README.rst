@@ -7,7 +7,7 @@ Introduction
 ------------
 
 Formify is a validation library for Python written using `TDD
-<http://en.wikipedia.org/wiki/Test-driven_development>` approach and inspired
+<http://en.wikipedia.org/wiki/Test-driven_development>`_ approach and inspired
 by other similar toolkits, especially WTForms. The main goal of this library is
 to be completely independent from other frameworks, so same validation model
 could be used in both web and desktop applications.
@@ -43,4 +43,4 @@ License
 -------
 
 Formify is distributed under the `MIT license
-<http://opensource.org/licenses/mit-license.php>`.
+<http://opensource.org/licenses/mit-license.php>`_.
