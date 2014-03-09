@@ -10,11 +10,16 @@ import collections
 from formify import _utils
 from formify.validators import UnboundValidator
 
+__all__ = ['SchemaMeta', 'Schema']
+
 
 class SchemaMeta(type):
+    """Metaclass for :class:`Schema`."""
 
     @property
     def __validators__(cls):
+        """Map of unbound validators defined in schema sorted by creation
+        order."""
         attrs = []
         for name in dir(cls):
             if name == '__validators__':
@@ -29,6 +34,7 @@ class SchemaMeta(type):
 
 
 class Schema(object):
+    """Base class for data entities."""
     __metaclass__ = SchemaMeta
 
     def __init__(self, **kwargs):
@@ -67,6 +73,8 @@ class Schema(object):
 
     @_utils.memoized_property
     def __validators__(self):
+        """Map of validators defined as class attributes and sorted by creation
+        order."""
         validators = collections.OrderedDict()
         for k, v in self.__class__.__validators__.iteritems():
             validators[k] = v(owner=self)
@@ -74,6 +82,7 @@ class Schema(object):
 
     @property
     def errors(self):
+        """Map of schema errors."""
         result = {}
         for k, v in self.__validators__.iteritems():
             errors = v.errors
@@ -82,6 +91,12 @@ class Schema(object):
         return result
 
     def is_valid(self):
+        """Check if schema object is valid.
+
+        Calling this method invokes validation process in all validators. If
+        one or more validators cannot validate their values validation of
+        entire schema fails.
+        """
         status = True
         for v in self.__validators__.itervalues():
             if not v.is_valid():

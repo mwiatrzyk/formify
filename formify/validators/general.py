@@ -22,6 +22,10 @@ __all__ = ['BaseString', 'String', 'Regex', 'URL', 'Email', 'Numeric',
 
 
 class BaseString(Validator):
+    """Common base class for string validators.
+
+    Converts to: ``unicode``
+    """
 
     @property
     def python_type(self):
@@ -29,6 +33,13 @@ class BaseString(Validator):
 
 
 class String(BaseString, LengthValidatorMixin):
+    """Validate string input.
+
+    :param min_length:
+        minimal length of input value
+    :param max_length:
+        maximal length of input value
+    """
     messages = dict(BaseString.messages)
     messages.update({
         'value_too_short': 'Expecting at least %(min_length)s characters',
@@ -43,6 +54,13 @@ class String(BaseString, LengthValidatorMixin):
 
 
 class Regex(BaseString):
+    """Validate string input against defined regular expression.
+
+    :param pattern:
+        regular expression pattern
+    :param flags:
+        regular expression flags (see :mod:`re` for details)
+    """
     messages = dict(BaseString.messages)
     messages.update({
         'pattern_mismatch': 'Value does not match pattern %(pattern)s'
@@ -60,6 +78,7 @@ class Regex(BaseString):
 
 
 class URL(Regex):
+    """Validate URL address."""
     messages = dict(Regex.messages)
     messages.update({
         'pattern_mismatch': 'Invalid URL address'
@@ -70,6 +89,7 @@ class URL(Regex):
 
 
 class Email(Regex):
+    """Validate e-mail address."""
     messages = dict(Regex.messages)
     messages.update({
         'pattern_mismatch': 'Invalid e-mail address'
@@ -80,6 +100,13 @@ class Email(Regex):
 
 
 class Numeric(Validator, ValueValidatorMixin):
+    """Base class for numeric validators.
+
+    :param min_value:
+        minimal input value
+    :param max_value:
+        maximal input value
+    """
     messages = dict(Validator.messages)
     messages.update({
         'value_too_low': 'Expecting value greater or equal to %(min_value)s',
@@ -94,6 +121,10 @@ class Numeric(Validator, ValueValidatorMixin):
 
 
 class Integer(Numeric):
+    """Validate integer number input.
+
+    Converts to: ``int``
+    """
 
     @property
     def python_type(self):
@@ -101,6 +132,10 @@ class Integer(Numeric):
 
 
 class Float(Numeric):
+    """Validate float number input.
+
+    Converts to: ``float``
+    """
 
     @property
     def python_type(self):
@@ -108,6 +143,10 @@ class Float(Numeric):
 
 
 class Decimal(Numeric):
+    """Validate decimal number input.
+
+    Converts to: :class:`decimal.Decimal`
+    """
 
     @property
     def python_type(self):
@@ -115,6 +154,27 @@ class Decimal(Numeric):
 
 
 class Boolean(Validator):
+    """Validate boolean input.
+
+    Converts to: ``bool``
+
+    If string input value is given it is checked against true- or
+    false-evaluating phrases. By default these are:
+
+    * 1, y, yes, on, true (for ``True``)
+    * 0, n, no, off, false (for ``False``)
+
+    If non-string input value is given it is simply converted to ``bool``.
+
+    Conversion fails if input value is not one of true- or false-evaluating
+    phrases (in case of string input) or if conversion to ``bool`` fails (in
+    case of non-string input).
+
+    :param trues:
+        specify custom true-evaluating phrases
+    :param falses:
+        specify custom false-evaluating phrases
+    """
     trues = set(['1', 'y', 'yes', 'on', 'true'])
     falses = set(['0', 'n', 'no', 'off', 'false'])
 
@@ -153,6 +213,20 @@ class Boolean(Validator):
 
 
 class DateTime(Validator, ValueValidatorMixin):
+    """Validate date/time input.
+
+    Converts to: :class:`datetime.datetime`
+
+    This validator allows only string input data - other types will cause
+    conversion error.
+
+    :param fmt:
+        expected format of input value (see :meth:`~datetime.datetime.strptime`)
+    :param min_value:
+        minimal allowed date/time
+    :param max_value:
+        maximal allowed date/time
+    """
     messages = dict(Validator.messages)
     messages.update({
         'conversion_error': 'Input date/time does not match format %(fmt)s',
@@ -200,6 +274,15 @@ class DateTime(Validator, ValueValidatorMixin):
 
 
 class Password(String):
+    """Validate password input.
+
+    This validator accepts string input and creates hash for it using specified
+    hash algorithm. Hashed value is then used as output value.
+
+    :param hash_algorithm:
+        name of hash algorithm to be used (``sha1`` by default). See
+        :mod:`hashlib` for details
+    """
 
     def __init__(self, hash_algorithm='sha1', **kwargs):
         super(Password, self).__init__(**kwargs)
@@ -220,6 +303,16 @@ class Password(String):
 
 
 class AnyOf(Validator):
+    """Validates input agains any of given validators.
+
+    This validator tries all of given subvalidators when converting value.
+    First one that was able to convert input value is then used. Later, when
+    validating, previously found validator is used, but another one is tried
+    (if there are any left) if validation fails.
+
+    :param validators:
+        list of subvalidators
+    """
 
     def __init__(self, validators, **kwargs):
         self.validators = validators
@@ -262,6 +355,13 @@ class AnyOf(Validator):
 
 
 class BaseEnum(Validator):
+    """Base class for enumeration validators.
+
+    :param options:
+        map of enum options
+    :param key_type:
+        type of option keys (``str`` by default)
+    """
 
     def __init__(self, options, key_type=str, **kwargs):
         super(BaseEnum, self).__init__(**kwargs)
@@ -270,6 +370,7 @@ class BaseEnum(Validator):
 
     @property
     def options(self):
+        """Ordered map of enum options."""
         return self._options
 
     @options.setter
@@ -278,6 +379,7 @@ class BaseEnum(Validator):
 
 
 class Enum(BaseEnum):
+    """Validates single-choice enumeration."""
     messages = dict(Validator.messages)
     messages.update({
         'invalid_option': 'Invalid option: %(key)s'
@@ -294,6 +396,7 @@ class Enum(BaseEnum):
 
 
 class MultiEnum(BaseEnum):
+    """Validates multiple-choice enumeration."""
     messages = dict(Validator.messages)
     messages.update({
         'invalid_options': 'Invalid options: %(keys)s',
@@ -335,6 +438,13 @@ class MultiEnum(BaseEnum):
 
 
 class EqualTo(Validator):
+    """Checks if input value is equal to value of another validator.
+
+    This validator requires owner and therefore cannot be used in standalone mode.
+
+    :param key:
+        key of validator to compare input with
+    """
     messages = dict(Validator.messages)
     messages.update({
         'not_equal': 'Values are not equal'
@@ -371,6 +481,11 @@ class EqualTo(Validator):
 
 
 class List(Validator, LengthValidatorMixin):
+    """Validates list of input data using given validator.
+
+    :param validator:
+        validator used to validate input data
+    """
     messages = dict(Validator.messages)
     messages.update({
         'too_short': 'Expecting at least %(min_length)s elements',
@@ -428,6 +543,7 @@ class List(Validator, LengthValidatorMixin):
 
 
 class Map(Validator):
+    """Validates map of input data using defined"""
     messages = dict(Validator.messages)
     messages.update({
         'inner_validator_error': 'Inner validator has failed'

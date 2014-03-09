@@ -5,17 +5,26 @@
 # This module is part of Formify and is released under the MIT license:
 # http://opensource.org/licenses/mit-license.php
 
+"""Core part of validation system."""
+
 import weakref
 
 from formify import _utils, exc
 from formify.validators.mixins import ValidatorMixin
 
-__all__ = ['UnboundValidator', 'Validator']
+__all__ = ['UnboundValidator', 'ValidatorMeta', 'Validator']
 
 
 class UnboundValidator(object):
     """Proxy class that wraps :class:`Validator` objects when created without
-    owner."""
+    owner.
+
+    Objects of this class are created by ``__new__`` method of
+    :class:`Validator` class when constructor is called wihout ``owner``
+    parameter and not in standalone mode. The role of this class is to wrap
+    original :class:`Validator` subclass object with all constructor parameters
+    and allow later binding to some owner.
+    """
 
     def __init__(self, validator, *args, **kwargs):
         _utils.set_creation_order(self)
@@ -56,18 +65,59 @@ class UnboundValidator(object):
 
 
 class ValidatorMeta(type):
+    """Metaclass for :class:`Validator`."""
 
     @property
     def __message_formatters__(cls):
+        """Map of custom message formatters."""
         formatters = {}
         for name in dir(cls):
             value = getattr(cls, name)
-            for key in getattr(value, '_ffy_message_formatter_keys', []):
-                formatters[key] = value
+            for message_id in getattr(value, '_ffy_message_formatter', []):
+                formatters[message_id] = value
         return formatters
 
 
 class Validator(ValidatorMixin):
+    """Base class for all validators.
+
+    :param key:
+        validator's key under which validator is accessible from its owner. By
+        default this is set to validator's attribute name
+    :param required:
+        specify if value is required for validator (``True`` by default)
+    :param default:
+        validator's default value
+    :param owner:
+        validator's owner. This can be other validator or
+        :class:`~formify.schema.Schema` class object
+    :param standalone:
+        when set to ``True``, validator is created in standalone mode and can
+        be used without schema
+    :param messages:
+        map of messages to update default ones with
+
+    .. attribute:: messages
+
+        Map of message templates used when rendering errors.
+
+        When raising :exc:`~formify.exc.FormifyError` exceptions, message
+        template is searched in this map and rendered with exception params.
+        Formatting of messages can be customized with
+        :func:`~formify.decorators.message_formatter` decorator.
+
+    .. attribute:: errors
+
+        List of validator's processing or conversion errors.
+
+    .. attribute:: raw_value
+
+        Last processed input value.
+
+    .. attribute:: value
+
+        Last successfuly converted :attr:`raw_value`.
+    """
     __metaclass__ = ValidatorMeta
     messages = {
         'conversion_error': 'Unable to convert %(value)r to %(python_type)r object',
@@ -97,9 +147,23 @@ class Validator(ValidatorMixin):
         self.messages.update(messages)
 
     def __call__(self, value):
+        """Calls :meth:`process`."""
         return self.process(value)
 
     def process(self, value):
+        """Process input value.
+
+        This method is responsible for conversion of input value to
+        :attr:`python_type` type object. Calling this method will reset
+        previous validator state, i.e. :attr:`errors`, :attr:`raw_value` and
+        :attr:`value` properties and set up them according to processing result
+        of ``value``.
+
+        If processing was successful, converted value is returned and
+        validator's :attr:`value` is initialized with it. Otherwise, ``None``
+        is returned and list of errors is filled with messages specifying what
+        went wrong.
+        """
         self.errors = []
         self.raw_value = value
         if value is None:
@@ -111,6 +175,13 @@ class Validator(ValidatorMixin):
         return value
 
     def convert(self, value):
+        """Convert given value to instance of :attr:`python_type` object.
+
+        If conversion is successful, converted value is returned. Otherwise,
+        :exc:`~formify.exc.ConversionError` is raised.
+
+        This method does not change validator's state.
+        """
         try:
             return self.python_type(value)
         except Exception, e:
@@ -118,12 +189,27 @@ class Validator(ValidatorMixin):
                 value=value, python_type=self.python_type)
 
     def try_convert(self, value):
+        """Convert ``value`` to instance of :attr:`python_type` object and
+        raise no exceptions.
+
+        This method calls :meth:`convert` and catches
+        :exc:`~formify.exc.ConversionError` it may raise. If conversion is
+        successful, converted ``value`` is returned. Otherwise, conversion
+        error message is added to :attr:`errors` list and ``None`` is returned.
+
+        This method may change validator's state.
+        """
         try:
             return self.convert(value)
         except exc.ConversionError, e:
             self.add_error(e.message_id, **e.params)
 
     def try_validate(self, value):
+        """Validate previously converted ``value`` and raise no exceptions.
+
+        If validation is successful, ``True`` is returned. Otherwise error
+        message is added to :attr:`errors` list and ``False`` is returned.
+        """
         try:
             self.validate(value)
         except exc.ValidationError, e:
@@ -133,6 +219,13 @@ class Validator(ValidatorMixin):
             return True
 
     def is_valid(self):
+        """Check if validator is valid.
+
+        This is done by checking :attr:`errors` list, ``required`` flag and
+        finally by calling :meth:`try_validate`.
+
+        Returns ``True`` if validator is valid or ``False`` otherwise.
+        """
         if self.errors:
             return False
         elif self.required and self.raw_value is None:
@@ -144,6 +237,20 @@ class Validator(ValidatorMixin):
             return True
 
     def format_message(self, message_id, **params):
+        """Fill message template with params and return formatted message.
+
+        If custom message formatter is defined for ``message_id`` (with
+        :func:`~formify.decorators.message_formatter` decorator) it is called
+        with same parameters. If not, default message formatter is following::
+
+            def format_message(self, message_id, **params):
+                return self.messages[message_id] % params
+
+        :param message_id:
+            key of message template in :attr:`messages` map
+        :param `**params`:
+            message template parameters
+        """
         formatter = self.__class__.__message_formatters__.get(message_id)
         if formatter is not None:
             return formatter(self, message_id, **params)
@@ -151,11 +258,25 @@ class Validator(ValidatorMixin):
             return self.messages[message_id] % params
 
     def add_error(self, message_id, **params):
+        """Add error to list of errors.
+
+        This method uses :meth:`format_message` to prepare error message to be
+        added.
+
+        :param message_id:
+            key of message template in :attr:`messages` map
+        :param `**params`:
+            message template parameters
+        """
         message = self.format_message(message_id, **params)
         self.errors.append(message)
 
     @property
     def owner(self):
+        """Owner of this validator.
+
+        If validator has no owner this is ``None``.
+        """
         if self._owner is None:
            return self._owner
         else:
@@ -170,4 +291,9 @@ class Validator(ValidatorMixin):
 
     @property
     def python_type(self):
+        """Python type this validator converts to.
+
+        This property is not defined by default and therefore must be
+        implemented in all subclasses.
+        """
         raise NotImplementedError("'python_type' is not implemented in %r" % self.__class__)
