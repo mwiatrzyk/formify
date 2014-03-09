@@ -100,8 +100,10 @@ class Validator(BaseValidator):
     :param key:
         validator's key under which validator is accessible from its owner. By
         default this is set to validator's attribute name
-    :param required:
-        specify if value is required for validator (``True`` by default)
+    :param optional:
+        set to ``True`` to mark validator as optional. Validators that are not
+        optional (default) require a value. Lack of value causes validation
+        process to fail in such case
     :param default:
         validator's default value
     :param owner:
@@ -148,9 +150,9 @@ class Validator(BaseValidator):
         else:
             return object.__new__(cls, *args, **kwargs)
 
-    def __init__(self, key=None, required=True, default=None, owner=None, standalone=False, messages=None):
+    def __init__(self, key=None, optional=False, default=None, owner=None, standalone=False, messages=None):
         self.key = key
-        self.required = required
+        self.optional = optional
         self.default = default
         self.owner = owner
         self.standalone = standalone
@@ -237,14 +239,14 @@ class Validator(BaseValidator):
     def is_valid(self):
         """Check if validator is valid.
 
-        This is done by checking :attr:`errors` list, ``required`` flag and
+        This is done by checking :attr:`errors` list, ``optional`` flag and
         finally by calling :meth:`try_validate`.
 
         Returns ``True`` if validator is valid or ``False`` otherwise.
         """
         if self.errors:
             return False
-        elif self.required and self.raw_value is None:
+        elif not self.optional and self.raw_value is None:
             self.add_error('required_error')
             return False
         elif not self.try_validate(self.value):
