@@ -418,32 +418,32 @@ class TestAnyOf(unittest.TestCase):
         self.assertEqual(-1.0, self.uut.value)
 
 
-class TestBaseEnum(unittest.TestCase):
+class TestBaseChoice(unittest.TestCase):
 
     def test_createWithDictAsOptions(self):
-        uut = formify.BaseEnum({1: 'One'}, standalone=True)
+        uut = formify.BaseChoice({1: 'One'}, standalone=True)
         self.assertIsInstance(uut.options, collections.OrderedDict)
         self.assertEqual({1: 'One'}, uut.options)
 
     def test_createWithListOfTuplesAsOptions(self):
-        uut = formify.BaseEnum([(1, 'One')], standalone=True)
+        uut = formify.BaseChoice([(1, 'One')], standalone=True)
         self.assertIsInstance(uut.options, collections.OrderedDict)
         self.assertEqual({1: 'One'}, uut.options)
 
     def test_createWithOrderedDictAsOptions(self):
-        uut = formify.BaseEnum(collections.OrderedDict({1: 'One'}), standalone=True)
+        uut = formify.BaseChoice(collections.OrderedDict({1: 'One'}), standalone=True)
         self.assertIsInstance(uut.options, collections.OrderedDict)
         self.assertEqual({1: 'One'}, uut.options)
 
 
-class TestEnum(unittest.TestCase):
+class TestChoice(unittest.TestCase):
     options = {
         1: 'One',
         2: 'Two'
     }
 
     def test_validInputData(self):
-        uut = formify.Enum(self.options, key_type=int, standalone=True)
+        uut = formify.Choice(self.options, key_type=int, standalone=True)
 
         self.assertIs(uut.python_type, int)
 
@@ -456,7 +456,7 @@ class TestEnum(unittest.TestCase):
         self.assertTrue(uut.is_valid())
 
     def test_invalidInputData(self):
-        uut = formify.Enum(self.options, key_type=int, standalone=True)
+        uut = formify.Choice(self.options, key_type=int, standalone=True)
 
         uut('3')
         self.assertEqual(3, uut.value)
@@ -464,7 +464,7 @@ class TestEnum(unittest.TestCase):
         self.assertIn('Invalid option: 3', uut.errors)
 
 
-class TestMultiEnum(unittest.TestCase):
+class TestMultiChoice(unittest.TestCase):
     options = {
         1: 'One',
         2: 'Two',
@@ -472,7 +472,7 @@ class TestMultiEnum(unittest.TestCase):
     }
 
     def test_validInputData(self):
-        uut = formify.MultiEnum(self.options, key_type=int, standalone=True)
+        uut = formify.MultiChoice(self.options, key_type=int, standalone=True)
 
         uut('1')
         self.assertEqual(set([1]), uut.value)
@@ -487,7 +487,7 @@ class TestMultiEnum(unittest.TestCase):
         self.assertTrue(uut.is_valid())
 
     def test_invalidInputData(self):
-        uut = formify.MultiEnum(self.options, key_type=int, standalone=True)
+        uut = formify.MultiChoice(self.options, key_type=int, standalone=True)
 
         uut(1)
         self.assertIs(uut.value, None)

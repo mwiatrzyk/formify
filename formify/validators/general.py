@@ -18,7 +18,7 @@ from formify.validators.mixins import LengthValidatorMixin, ValueValidatorMixin
 
 __all__ = ['BaseString', 'String', 'Regex', 'URL', 'Email', 'Numeric',
     'Integer', 'Float', 'Decimal', 'Boolean', 'DateTime', 'Password', 'AnyOf',
-    'BaseEnum', 'Enum', 'MultiEnum', 'EqualTo', 'List', 'Map']
+    'BaseChoice', 'Choice', 'MultiChoice', 'EqualTo', 'List', 'Map']
 
 
 class BaseString(Validator):
@@ -354,7 +354,7 @@ class AnyOf(Validator):
         return self.validator.python_type
 
 
-class BaseEnum(Validator):
+class BaseChoice(Validator):
     """Base class for enumeration validators.
 
     :param options:
@@ -364,7 +364,7 @@ class BaseEnum(Validator):
     """
 
     def __init__(self, options, key_type=str, **kwargs):
-        super(BaseEnum, self).__init__(**kwargs)
+        super(BaseChoice, self).__init__(**kwargs)
         self.options = options
         self.key_type = key_type
 
@@ -378,7 +378,7 @@ class BaseEnum(Validator):
         self._options = collections.OrderedDict(value)
 
 
-class Enum(BaseEnum):
+class Choice(BaseChoice):
     """Validates single-choice enumeration."""
     messages = dict(Validator.messages)
     messages.update({
@@ -386,7 +386,7 @@ class Enum(BaseEnum):
     })
 
     def validate(self, value):
-        super(Enum, self).validate(value)
+        super(Choice, self).validate(value)
         if value not in self.options:
             raise exc.ValidationError('invalid_option', key=value)
 
@@ -395,7 +395,7 @@ class Enum(BaseEnum):
         return self.key_type
 
 
-class MultiEnum(BaseEnum):
+class MultiChoice(BaseChoice):
     """Validates multiple-choice enumeration."""
     messages = dict(Validator.messages)
     messages.update({
@@ -404,7 +404,7 @@ class MultiEnum(BaseEnum):
     })
 
     def try_convert(self, value):
-        value = super(MultiEnum, self).try_convert(value)
+        value = super(MultiChoice, self).try_convert(value)
         if value is None:
             return value
         result = self.python_type()
@@ -426,7 +426,7 @@ class MultiEnum(BaseEnum):
                 key=key, key_type=self.key_type)
 
     def validate(self, value):
-        super(MultiEnum, self).validate(value)
+        super(MultiChoice, self).validate(value)
         common_options = set(self.options).intersection(value)
         if common_options != value:
             raise exc.ValidationError('invalid_options',
