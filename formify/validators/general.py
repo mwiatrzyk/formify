@@ -355,10 +355,14 @@ class AnyOf(Validator):
 
 
 class BaseChoice(Validator):
-    """Base class for enumeration validators.
+    """Base class for choice validators.
+
+    Choice validators allow one (or more) predefined constant input values and
+    disallow all other.
 
     :param options:
-        map of enum options
+        map of choice options (with choice value as key and choice name as
+        value)
     :param key_type:
         type of option keys (``str`` by default)
     """
@@ -379,7 +383,7 @@ class BaseChoice(Validator):
 
 
 class Choice(BaseChoice):
-    """Validates single-choice enumeration."""
+    """Validates if input data matches any of predefined options."""
     messages = dict(Validator.messages)
     messages.update({
         'invalid_option': 'Invalid option: %(key)s'
@@ -396,7 +400,8 @@ class Choice(BaseChoice):
 
 
 class MultiChoice(BaseChoice):
-    """Validates multiple-choice enumeration."""
+    """Validates if every item of input data set matches any of predefined
+    options."""
     messages = dict(Validator.messages)
     messages.update({
         'invalid_options': 'Invalid options: %(keys)s',
@@ -440,7 +445,8 @@ class MultiChoice(BaseChoice):
 class EqualTo(Validator):
     """Checks if input value is equal to value of another validator.
 
-    This validator requires owner and therefore cannot be used in standalone mode.
+    This validator requires owner and therefore cannot be used in standalone
+    mode.
 
     :param key:
         key of validator to compare input with

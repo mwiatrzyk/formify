@@ -10,6 +10,7 @@ from formify.validators.general import Regex
 
 
 class BaseISBN(Regex):
+    """Base class for ISBN number validators."""
     messages = dict(Regex.messages)
     messages.update({
         'pattern_mismatch': 'Not a valid ISBN number',
@@ -37,6 +38,7 @@ class BaseISBN(Regex):
 
 
 class ISBN10(BaseISBN):
+    """Validates ISBN10 numbers."""
     isbn_re = r'^\d+-\d+-\d+-\d$'
 
     def calculate_checksum(self, value):
@@ -54,6 +56,7 @@ class ISBN10(BaseISBN):
 
 
 class ISBN13(BaseISBN):
+    """Validates ISBN13 numbers."""
     isbn_re = r'^((978|979)-)?\d+-\d+-\d+-\d+$'
 
     def calculate_checksum(self, value):
