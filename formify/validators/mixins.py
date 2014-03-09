@@ -11,6 +11,19 @@ from formify.validators.base import BaseValidator
 
 
 class LengthValidationMixin(BaseValidator):
+    """Mixin class suplying validator with value length validation.
+
+    This mixin requires validator that inherits from it to have two additional
+    properties:
+
+    ``min_length``
+        for minimal accepted length of value (inclusive)
+
+    ``max_length``
+        for maximal accepted length of value (inclusive)
+
+    Default value for each should be ``None``.
+    """
 
     def validate(self, value):
         super(LengthValidationMixin, self).validate(value)
@@ -37,6 +50,19 @@ class LengthValidationMixin(BaseValidator):
 
 
 class RangeValidationMixin(BaseValidator):
+    """Mixin class suplying validator with value range validation.
+
+    This mixin requires validator that inherits from it to have two additional
+    properties:
+
+    ``min_value``
+        for minimal accepted value (inclusive)
+
+    ``max_value``
+        for maximal accepted value (inclusive)
+
+    Default value for each should be ``None``.
+    """
 
     def validate(self, value):
         super(RangeValidationMixin, self).validate(value)
