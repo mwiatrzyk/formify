@@ -10,7 +10,6 @@
 import weakref
 
 from formify import _utils, exc
-from formify.validators.mixins import ValidatorMixin
 
 __all__ = ['UnboundValidator', 'ValidatorMeta', 'Validator']
 
@@ -78,7 +77,24 @@ class ValidatorMeta(type):
         return formatters
 
 
-class Validator(ValidatorMixin):
+class BaseValidator(object):
+    """Common base class for validators and mixins.
+
+    This class provides set of methods that can be extended using mixin
+    pattern. Any mixin that is going to extend functionality of validator class
+    must inherit from this base class.
+    """
+
+    def validate(self, value):
+        """Validate given value of known type.
+
+        If validation fails, this method should raise
+        :exc:`~formify.exc.ValidationError` exception. If no exception is
+        thrown, ``value`` is said to be valid.
+        """
+
+
+class Validator(BaseValidator):
     """Base class for all validators.
 
     :param key:

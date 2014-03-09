@@ -7,14 +7,10 @@
 
 from formify import exc
 
-
-class ValidatorMixin(object):
-
-    def validate(self, value):
-        pass
+from formify.validators.base import BaseValidator
 
 
-class LengthValidatorMixin(ValidatorMixin):
+class LengthValidatorMixin(BaseValidator):
 
     def validate(self, value):
         super(LengthValidatorMixin, self).validate(value)
@@ -40,7 +36,7 @@ class LengthValidatorMixin(ValidatorMixin):
             raise exc.ValidationError('value_too_long', max_length=self.max_length)
 
 
-class ValueValidatorMixin(ValidatorMixin):
+class ValueValidatorMixin(BaseValidator):
 
     def validate(self, value):
         super(ValueValidatorMixin, self).validate(value)
