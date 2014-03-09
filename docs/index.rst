@@ -6,11 +6,6 @@
 Formify -- validation library for Python
 ========================================
 
-Contents:
-
-.. toctree::
-   :maxdepth: 2
-
 Introduction
 ------------
 
@@ -92,6 +87,22 @@ formify.validators.general
 """"""""""""""""""""""""""
 
 .. automodule:: formify.validators.general
+    :members:
+    :special-members:
+    :show-inheritance:
+
+formify.validators.iso
+""""""""""""""""""""""
+
+.. automodule:: formify.validators.iso
+    :members:
+    :special-members:
+    :show-inheritance:
+
+formify.validators.mixins
+"""""""""""""""""""""""""
+
+.. automodule:: formify.validators.mixins
     :members:
     :special-members:
     :show-inheritance:

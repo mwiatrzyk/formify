@@ -33,6 +33,7 @@ class ConversionError(FormifyError, TypeError):
 class ValidationError(FormifyError, ValueError):
     """Exception raised when validation error occurs.
 
-    This exception is raised by :meth:`~formify.validators.Validator.validate`
-    method when validation fails for converted value of known type.
+    This exception is raised by
+    :meth:`~formify.validators.BaseValidator.validate` method when validation
+    fails for converted value of known type.
     """
