@@ -10,11 +10,11 @@ import unittest
 from formify.validators import mixins, Validator
 
 
-class TestLengthValidatorMixin(unittest.TestCase):
+class TestLengthValidationMixin(unittest.TestCase):
 
     def setUp(self):
 
-        class UUT(Validator, mixins.LengthValidatorMixin):
+        class UUT(Validator, mixins.LengthValidationMixin):
             python_type = unicode
             messages = {
                 'value_too_short': 'Expecting at least %(min_length)s characters',
@@ -76,11 +76,11 @@ class TestLengthValidatorMixin(unittest.TestCase):
         self.assertEqual('Expecting number of characters between 3 and 5', uut.errors[0])
 
 
-class TestValueValidatorMixin(unittest.TestCase):
+class TestRangeValidationMixin(unittest.TestCase):
 
     def setUp(self):
 
-        class UUT(Validator, mixins.ValueValidatorMixin):
+        class UUT(Validator, mixins.RangeValidationMixin):
             python_type = int
             messages = {
                 'value_too_low': 'Value must not be less than %(min_value)s',

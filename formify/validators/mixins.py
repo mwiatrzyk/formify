@@ -10,10 +10,10 @@ from formify import exc
 from formify.validators.base import BaseValidator
 
 
-class LengthValidatorMixin(BaseValidator):
+class LengthValidationMixin(BaseValidator):
 
     def validate(self, value):
-        super(LengthValidatorMixin, self).validate(value)
+        super(LengthValidationMixin, self).validate(value)
         if self.min_length is not None and self.max_length is not None:
             self.__validate_length_range(value)
         elif self.min_length is not None:
@@ -36,10 +36,10 @@ class LengthValidatorMixin(BaseValidator):
             raise exc.ValidationError('value_too_long', max_length=self.max_length)
 
 
-class ValueValidatorMixin(BaseValidator):
+class RangeValidationMixin(BaseValidator):
 
     def validate(self, value):
-        super(ValueValidatorMixin, self).validate(value)
+        super(RangeValidationMixin, self).validate(value)
         if self.min_value is not None and self.max_value is not None:
             self.__validate_value_range(value)
         elif self.min_value is not None:

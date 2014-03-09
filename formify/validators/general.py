@@ -14,7 +14,7 @@ import collections
 from formify import exc
 from formify.decorators import message_formatter
 from formify.validators.base import Validator
-from formify.validators.mixins import LengthValidatorMixin, ValueValidatorMixin
+from formify.validators.mixins import LengthValidationMixin, RangeValidationMixin
 
 __all__ = ['BaseString', 'String', 'Regex', 'URL', 'Email', 'Numeric',
     'Integer', 'Float', 'Decimal', 'Boolean', 'DateTime', 'Password', 'AnyOf',
@@ -32,7 +32,7 @@ class BaseString(Validator):
         return unicode
 
 
-class String(BaseString, LengthValidatorMixin):
+class String(BaseString, LengthValidationMixin):
     """Validate string input.
 
     :param min_length:
@@ -99,7 +99,7 @@ class Email(Regex):
         super(Email, self).__init__(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$', **kwargs)
 
 
-class Numeric(Validator, ValueValidatorMixin):
+class Numeric(Validator, RangeValidationMixin):
     """Base class for numeric validators.
 
     :param min_value:
@@ -212,7 +212,7 @@ class Boolean(Validator):
         return bool
 
 
-class DateTime(Validator, ValueValidatorMixin):
+class DateTime(Validator, RangeValidationMixin):
     """Validate date/time input.
 
     Converts to: :class:`datetime.datetime`
@@ -486,7 +486,7 @@ class EqualTo(Validator):
         return self.validator.python_type
 
 
-class List(Validator, LengthValidatorMixin):
+class List(Validator, LengthValidationMixin):
     """Validates list of input data using given validator.
 
     :param validator:
