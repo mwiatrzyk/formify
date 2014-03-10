@@ -17,6 +17,15 @@ def set_creation_order(self):
     _creation_order += 1
 
 
+def maybe_callable(value, *args, **kwargs):
+    """If ``value`` is callable, call it with given args and return result or
+    otherwise return ``value``."""
+    if callable(value):
+        return value(*args, **kwargs)
+    else:
+        return value
+
+
 class memoized_property(object):
     """A read-only property that is only evaluated once."""
 

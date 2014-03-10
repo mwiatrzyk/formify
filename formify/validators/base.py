@@ -158,7 +158,7 @@ class Validator(BaseValidator):
         self.standalone = standalone
         if messages is not None:
             self.__update_messages(messages)
-        self.process(default)
+        self.process(_utils.maybe_callable(default))
 
     def __update_messages(self, messages):
         self.messages = dict(self.__class__.messages)

@@ -5,6 +5,7 @@
 # This module is part of Formify and is released under the MIT license:
 # http://opensource.org/licenses/mit-license.php
 
+import random
 import unittest
 
 import formify
@@ -74,6 +75,25 @@ class TestSchema(unittest.TestCase):
         uut = UUT()
 
         self.assertEqual(123, uut.a)
+
+    def test_whenCallableGivenAsDefaultValue_itsReturnValueIsUsedAsDefault(self):
+
+        class UUT(formify.Schema):
+            a = formify.Integer(default=lambda: 123)
+
+        uut = UUT()
+
+        self.assertEqual(123, uut.a)
+
+    def test_whenCallableGivenAsDefaultValue_itIsEvaluatedForEveryInstance(self):
+
+        class UUT(formify.Schema):
+            a = formify.Integer(default=lambda: random.random() * 100)
+
+        uut1 = UUT()
+        uut2 = UUT()
+
+        self.assertNotEqual(uut1.a, uut2.a)
 
     def test_eachEntityHasItsOwnValidatorInstances(self):
         a = self.UUT()
