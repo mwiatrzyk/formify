@@ -114,6 +114,8 @@ class Validator(BaseValidator):
         be used without schema
     :param messages:
         map of messages to update default ones with
+    :param preprocessors:
+        list of validator preprocessors
 
     .. attribute:: messages
 
@@ -150,7 +152,9 @@ class Validator(BaseValidator):
         else:
             return object.__new__(cls, *args, **kwargs)
 
-    def __init__(self, key=None, optional=False, default=None, owner=None, standalone=False, messages=None):
+    def __init__(self, key=None, optional=False, default=None, owner=None,
+            standalone=False, messages=None, preprocessors=None):
+        self.preprocessors = preprocessors or []
         self.key = key
         self.optional = optional
         self.default = default
@@ -184,12 +188,19 @@ class Validator(BaseValidator):
         """
         self.errors = []
         self.raw_value = value
+        value = self.run_preprocessors(value)
         if value is None:
             value = self.value = None
         elif not isinstance(value, self.python_type):
             value = self.value = self.try_convert(value)
         else:
             self.value = value
+        return value
+
+    def run_preprocessors(self, value):
+        """Execute chain of preprocessors on given value."""
+        for func in self.preprocessors:
+            value = func(self, value)
         return value
 
     def convert(self, value):
@@ -288,6 +299,10 @@ class Validator(BaseValidator):
         """
         message = self.format_message(message_id, **params)
         self.errors.append(message)
+
+    def add_preprocessor(self, f):
+        """Add given function to preprocessing chain."""
+        self.preprocessors.append(f)
 
     @property
     def owner(self):

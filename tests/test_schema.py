@@ -10,6 +10,8 @@ import unittest
 
 import formify
 
+from formify.decorators import preprocessor
+
 
 class TestSchema(unittest.TestCase):
 
@@ -108,3 +110,23 @@ class TestSchema(unittest.TestCase):
         self.assertFalse(self.uut.is_valid())
         self.assertIn('a', self.uut.errors)  # required missing
         self.assertIn('c', self.uut.errors)  # conversion error
+
+    def test_whenPreprocessorDefined_itIsInvokedOnceValueIsAssigned(self):
+
+        class UUT(formify.Schema):
+            a = formify.Integer()
+
+            @preprocessor('a')
+            def check_numeric(self, validator, value):
+                if value.isdigit():
+                    return value
+                else:
+                    return -1
+
+        uut = UUT()
+
+        uut.a = '123'
+        self.assertEqual(123, uut.a)
+
+        uut.a = 'abc'
+        self.assertEqual(-1, uut.a)

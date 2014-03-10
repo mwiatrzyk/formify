@@ -5,6 +5,7 @@
 # This module is part of Formify and is released under the MIT license:
 # http://opensource.org/licenses/mit-license.php
 
+import functools
 import collections
 
 from formify import _utils
@@ -31,6 +32,17 @@ class SchemaMeta(type):
                 attrs.append((value.key, value))
         attrs.sort(key=lambda x: x[1]._creation_order)
         return collections.OrderedDict(attrs)
+
+    @property
+    def __preprocessors__(cls):
+        """Map of preprocessors."""
+        result = {}
+        for name in dir(cls):
+            value = getattr(cls, name)
+            if not isinstance(value, UnboundValidator):
+                for key in getattr(value, '_ffy_preprocessor', []):
+                    result[key] = [value]
+        return result
 
 
 class Schema(object):
@@ -77,8 +89,15 @@ class Schema(object):
         order."""
         validators = collections.OrderedDict()
         for k, v in self.__class__.__validators__.iteritems():
-            validators[k] = v(owner=self)
+            bound = v(owner=self)
+            bound.preprocessors = self.__get_preprocessors_for(k)
+            validators[k] = bound
         return validators
+
+    def __get_preprocessors_for(self, key):
+        return [
+            functools.partial(x, self)
+            for x in self.__class__.__preprocessors__.get(key, [])]
 
     @property
     def errors(self):

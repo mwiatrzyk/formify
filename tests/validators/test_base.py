@@ -55,3 +55,20 @@ class TestValidator(unittest.TestCase):
     def test_whenRequiredAndValueIsMissing_validationFails(self):
         self.assertFalse(self.uut.is_valid())
         self.assertIn('This field is required', self.uut.errors)
+
+    def test_whenPreprocessorAdded_itIsInvokedWhenProcessingBeforeConversion(self):
+
+        def preprocess(self, value):
+            if value.isalpha():
+                return -1
+            else:
+                return value
+
+        self.uut('x')
+        self.assertFalse(self.uut.is_valid())
+
+        self.uut.add_preprocessor(preprocess)
+
+        self.uut('x')
+        self.assertTrue(self.uut.is_valid())
+        self.assertEqual(-1, self.uut.value)
