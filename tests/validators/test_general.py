@@ -661,3 +661,8 @@ class TestMap(unittest.TestCase):
         self.assertEqual({'a': 3}, uut.value)
         self.assertFalse(uut.is_valid())
         self.assertTrue(uut['a'].errors)
+
+    def test_rawValueIsNotTheSameObjectAsValue(self):
+        self.uut({'a': 1, 'b': 2})
+
+        self.assertIsNot(self.uut.raw_value, self.uut.value)

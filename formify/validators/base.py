@@ -7,6 +7,7 @@
 
 """Core part of validation system."""
 
+import copy
 import weakref
 
 from formify import _utils, exc
@@ -187,7 +188,7 @@ class Validator(BaseValidator):
         went wrong.
         """
         self.errors = []
-        self.raw_value = value
+        self.raw_value = self.__copy_mutable(value)
         value = self.run_preprocessors(value)
         if value is None:
             value = self.value = None
@@ -196,6 +197,12 @@ class Validator(BaseValidator):
         else:
             self.value = value
         return value
+
+    def __copy_mutable(self, value):
+        if _utils.is_mutable(value):
+            return copy.deepcopy(value)
+        else:
+            return value
 
     def run_preprocessors(self, value):
         """Execute chain of preprocessors on given value."""

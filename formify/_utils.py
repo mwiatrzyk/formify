@@ -26,6 +26,12 @@ def maybe_callable(value, *args, **kwargs):
         return value
 
 
+def is_mutable(value):
+    """Return ``True`` if ``value`` is instance of mutable type or ``False``
+    otherwise."""
+    return isinstance(value, (dict, list))
+
+
 class memoized_property(object):
     """A read-only property that is only evaluated once."""
 
