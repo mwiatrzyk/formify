@@ -189,10 +189,10 @@ class Validator(BaseValidator):
         """
         self.errors = []
         self.raw_value = self.__copy_mutable(value)
-        value = self.run_preprocessors(value)
         if value is None:
             value = self.value = None
         elif not isinstance(value, self.python_type):
+            value = self.run_preprocessors(value)
             value = self.value = self.try_convert(value)
         else:
             self.value = value

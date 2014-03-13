@@ -57,18 +57,27 @@ class TestValidator(unittest.TestCase):
         self.assertIn('This field is required', self.uut.errors)
 
     def test_whenPreprocessorAdded_itIsInvokedWhenProcessingBeforeConversion(self):
+        values_preprocessed = set()
 
         def preprocess(self, value):
+            values_preprocessed.add(value)
             if value.isalpha():
                 return -1
             else:
                 return value
 
         self.uut('x')
+        self.assertEqual(0, len(values_preprocessed))
         self.assertFalse(self.uut.is_valid())
 
         self.uut.add_preprocessor(preprocess)
 
         self.uut('x')
+        self.assertEqual(1, len(values_preprocessed))
         self.assertTrue(self.uut.is_valid())
         self.assertEqual(-1, self.uut.value)
+
+        self.uut(123)
+        self.assertEqual(1, len(values_preprocessed))  # not ivoked if conversion not needed
+        self.assertTrue(self.uut.is_valid())
+        self.assertEqual(123, self.uut.value)
