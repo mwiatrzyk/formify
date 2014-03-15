@@ -188,7 +188,7 @@ class Validator(BaseValidator):
         went wrong.
         """
         self.errors = []
-        self.raw_value = self.__copy_mutable(value)
+        self.raw_value = value = self.__copy_mutable(value)
         if value is None:
             value = self.value = None
         elif not isinstance(value, self.python_type):

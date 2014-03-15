@@ -671,3 +671,7 @@ class TestMap(unittest.TestCase):
 
         self.assertEqual({'a': 123}, uut({'a': '123'}))
         self.assertEqual({'a': 456}, uut({'a': '456', 'b': 1}))
+
+    def test_processedValueIsNotTheSameObjectAsInputValue(self):
+        data = {}
+        self.assertIsNot(data, self.uut(data))
