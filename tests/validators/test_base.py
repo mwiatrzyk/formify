@@ -81,3 +81,12 @@ class TestValidator(unittest.TestCase):
         self.assertEqual(1, len(values_preprocessed))  # not ivoked if conversion not needed
         self.assertTrue(self.uut.is_valid())
         self.assertEqual(123, self.uut.value)
+
+    def test_rawValueIsACopyInCaseOfMutableTypes(self):
+        data = {}
+        self.uut(data)
+        self.assertIsNot(data, self.uut.raw_value)
+
+        data = tuple()
+        self.uut(data)
+        self.assertIs(data, self.uut.raw_value)
