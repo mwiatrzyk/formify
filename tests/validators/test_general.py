@@ -661,3 +661,13 @@ class TestMap(unittest.TestCase):
         self.assertEqual({'a': 3}, uut.value)
         self.assertFalse(uut.is_valid())
         self.assertTrue(uut['a'].errors)
+
+    def test_ifStrictProcessingEnabled_extraKeysInInputDataWillCauseExceptionToBeRaised(self):
+        with self.assertRaises(KeyError):
+            self.uut({'a': 1, 'b': 2, 'c': 3})
+
+    def test_ifStrictProcessingDisabled_extraKeysInInputDataAreIgnored(self):
+        uut = formify.Map({'a': formify.Integer}, strict_processing=False, standalone=True)
+
+        self.assertEqual({'a': 123}, uut({'a': '123'}))
+        self.assertEqual({'a': 456}, uut({'a': '456', 'b': 1}))

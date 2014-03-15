@@ -549,14 +549,25 @@ class List(Validator, LengthValidationMixin):
 
 
 class Map(Validator):
-    """Validates map of input data using defined"""
+    """Validates map of input data using corresponding map of validators.
+
+    :param validators:
+        map of validators. This can be dict or :class:`~formify.schema.Schema`
+        class object.
+    :param strict_processing:
+        enable or disable strict processing of input data. If strict processing
+        is enabled (default), any key given in input data that does not have
+        corresponding validator will cause :exc:`KeyError` to be raised. If
+        strict processing is disabled such keys will be silently ignored.
+    """
     messages = dict(Validator.messages)
     messages.update({
         'inner_validator_error': 'Inner validator has failed'
     })
 
-    def __init__(self, validators, **kwargs):
+    def __init__(self, validators, strict_processing=True, **kwargs):
         super(Map, self).__init__(**kwargs)
+        self.strict_processing = strict_processing
         if hasattr(validators, '__validators__'):
             self.validators = self.__bind_validators(validators.__validators__)
         else:
@@ -581,8 +592,11 @@ class Map(Validator):
 
     def process(self, value):
         value = super(Map, self).process(value)
-        for k, v in (value or {}).iteritems():
-            value[k] = self.validators[k].process(v)
+        for k, v in (value or {}).items():
+            if self.strict_processing or k in self.validators:
+                value[k] = self.validators[k].process(v)
+            else:
+                del value[k]
         return value
 
     def is_valid(self):
