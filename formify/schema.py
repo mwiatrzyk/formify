@@ -44,6 +44,17 @@ class SchemaMeta(type):
                     result[key] = [value]
         return result
 
+    @property
+    def __postprocessors__(cls):
+        """Map of postprocessors."""
+        result = {}
+        for name in dir(cls):
+            value = getattr(cls, name)
+            if not isinstance(value, UnboundValidator):
+                for key in getattr(value, '_ffy_postprocessor', []):
+                    result[key] = [value]
+        return result
+
 
 class Schema(object):
     """Base class for data entities."""
@@ -91,6 +102,7 @@ class Schema(object):
         for k, v in self.__class__.__validators__.iteritems():
             bound = v(owner=self)
             bound.preprocessors = self.__get_preprocessors_for(k)
+            bound.postprocessors = self.__get_postprocessors_for(k)
             validators[k] = bound
         return validators
 
@@ -98,6 +110,11 @@ class Schema(object):
         return [
             functools.partial(x, self)
             for x in self.__class__.__preprocessors__.get(key, [])]
+
+    def __get_postprocessors_for(self, key):
+        return [
+            functools.partial(x, self)
+            for x in self.__class__.__postprocessors__.get(key, [])]
 
     @property
     def errors(self):

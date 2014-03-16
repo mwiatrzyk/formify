@@ -10,7 +10,7 @@ import unittest
 
 import formify
 
-from formify.decorators import preprocessor
+from formify.decorators import preprocessor, postprocessor
 
 
 class TestSchema(unittest.TestCase):
@@ -130,3 +130,23 @@ class TestSchema(unittest.TestCase):
 
         uut.a = 'abc'
         self.assertEqual(-1, uut.a)
+
+    def test_whenPostprocessorDefined_itIsInvokedForConvertedValues(self):
+
+        class UUT(formify.Schema):
+            a = formify.Integer()
+
+            @postprocessor('a')
+            def cast_to_str(self, validator, value):
+                return str(value)
+
+        uut = UUT()
+
+        uut.a = 123
+        self.assertEqual('123', uut.a)
+
+        uut.a = 'abc'
+        self.assertEqual(None, uut.a)
+
+        uut.a = '123'
+        self.assertEqual('123', uut.a)

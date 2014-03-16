@@ -36,11 +36,21 @@ def message_formatter(*message_ids):
     return proxy
 
 
-def preprocessor(*validator_keys):
+def preprocessor(*validators):
     """Decorate schema method as preprocessor of given validators."""
 
     def proxy(f):
-        f._ffy_preprocessor = set(validator_keys)
+        f._ffy_preprocessor = set(validators)
+        return f
+
+    return proxy
+
+
+def postprocessor(*validators):
+    """Decorate schema method as postprocessor of given validators."""
+
+    def proxy(f):
+        f._ffy_postprocessor = set(validators)
         return f
 
     return proxy

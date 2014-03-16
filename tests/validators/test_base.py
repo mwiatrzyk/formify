@@ -82,6 +82,32 @@ class TestValidator(unittest.TestCase):
         self.assertTrue(self.uut.is_valid())
         self.assertEqual(123, self.uut.value)
 
+    def test_whenPostprocessorAdded_itIsInvokedWhenProcessingAfterConversion(self):
+        values_postprocessed = set()
+
+        def postprocess(self, value):
+            values_postprocessed.add(value)
+            return str(value)
+
+        self.uut.add_postprocessor(postprocess)
+
+        self.uut(None)
+        self.assertEqual(0, len(values_postprocessed))
+
+        self.uut('x')
+        self.assertEqual(0, len(values_postprocessed))
+        self.assertFalse(self.uut.is_valid())
+
+        self.uut(123)
+        self.assertEqual(1, len(values_postprocessed))
+        self.assertTrue(self.uut.is_valid())
+        self.assertEqual('123', self.uut.value)
+
+        self.uut('123')
+        self.assertEqual(1, len(values_postprocessed))
+        self.assertTrue(self.uut.is_valid())
+        self.assertEqual('123', self.uut.value)
+
     def test_rawValueIsACopyInCaseOfMutableTypes(self):
         data = {}
         self.uut(data)

@@ -154,8 +154,10 @@ class Validator(BaseValidator):
             return object.__new__(cls, *args, **kwargs)
 
     def __init__(self, key=None, optional=False, default=None, owner=None,
-            standalone=False, messages=None, preprocessors=None):
+            standalone=False, messages=None, preprocessors=None,
+            postprocessors=None):
         self.preprocessors = preprocessors or []
+        self.postprocessors = postprocessors or []
         self.key = key
         self.optional = optional
         self.default = default
@@ -188,25 +190,33 @@ class Validator(BaseValidator):
         went wrong.
         """
         self.errors = []
-        self.raw_value = value = self.__copy_mutable(value)
-        if value is None:
-            value = self.value = None
-        elif not isinstance(value, self.python_type):
+        self.raw_value = value = self.__copy_if_mutable(value)
+        if self.__needs_conversion(value):
             value = self.run_preprocessors(value)
-            value = self.value = self.try_convert(value)
-        else:
-            self.value = value
+            value = self.try_convert(value)
+        if value is not None:
+            value = self.run_postprocessors(value)
+        self.value = value
         return value
 
-    def __copy_mutable(self, value):
+    def __copy_if_mutable(self, value):
         if _utils.is_mutable(value):
             return copy.deepcopy(value)
         else:
             return value
 
+    def __needs_conversion(self, value):
+        return value is not None and not isinstance(value, self.python_type)
+
     def run_preprocessors(self, value):
         """Execute chain of preprocessors on given value."""
         for func in self.preprocessors:
+            value = func(self, value)
+        return value
+
+    def run_postprocessors(self, value):
+        """Execute chain of postprocessors on given value."""
+        for func in self.postprocessors:
             value = func(self, value)
         return value
 
@@ -308,8 +318,12 @@ class Validator(BaseValidator):
         self.errors.append(message)
 
     def add_preprocessor(self, f):
-        """Add given function to preprocessing chain."""
+        """Add given function to the end of preprocessing chain."""
         self.preprocessors.append(f)
+
+    def add_postprocessor(self, f):
+        """Add given function to the end of postprocessing chain."""
+        self.postprocessors.append(f)
 
     @property
     def owner(self):
