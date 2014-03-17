@@ -190,7 +190,7 @@ class Validator(BaseValidator):
         went wrong.
         """
         self.errors = []
-        self.raw_value = value = self.__copy_if_mutable(value)
+        self.raw_value = self.__copy_if_mutable(value)
         if self.__needs_conversion(value):
             value = self.run_preprocessors(value)
             value = self.try_convert(value)
