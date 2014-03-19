@@ -629,10 +629,6 @@ class TestMap(unittest.TestCase):
 
         self.assertEqual({'a': 1, 'b': '2'}, uut.value)
 
-    def test_ifNoValidatorForInputDataKey_exceptionIsRaised(self):
-        with self.assertRaises(KeyError):
-            self.uut({'a': '1', 'b': 2, 'c': 3.14})
-
     def test_ifUnableToConvertToDict_processingFails(self):
         self.uut(123)
 
@@ -675,3 +671,21 @@ class TestMap(unittest.TestCase):
     def test_processedValueIsNotTheSameObjectAsInputValue(self):
         data = {}
         self.assertIsNot(data, self.uut(data))
+
+    def test_returnedValueCanBeUsedToInteractWithInnerValidators(self):
+        value = self.uut({'a': '1', 'b': 2})
+
+        self.assertEqual({'a': '1', 'b': 2}, self.uut.raw_value)
+        self.assertEqual({'a': 1, 'b': '2'}, value)
+        self.assertEqual(1, value.a)
+        self.assertEqual('2', value['b'])
+
+        value.a = '10'
+        self.assertEqual(10, value.a)
+        self.assertEqual(10, self.uut['a'].value)
+
+        value['b'] = 3
+        self.assertEqual('3', value.b)
+        self.assertEqual('3', self.uut['b'].value)
+
+        self.assertEqual({'a': 10, 'b': '3'}, dict(value))

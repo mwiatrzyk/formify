@@ -6,6 +6,7 @@
 # http://opensource.org/licenses/mit-license.php
 
 import re
+import weakref
 import hashlib
 import decimal
 import datetime
@@ -565,13 +566,67 @@ class Map(Validator):
         'inner_validator_error': 'Inner validator has failed'
     })
 
+    class _ValueProxy(object):
+
+        def __init__(self, owner):
+            self._owner = owner
+
+        @property
+        def _owner(self):
+            return self.__owner()
+
+        @_owner.setter
+        def _owner(self, value):
+            self.__owner = weakref.ref(value)
+
+        @property
+        def _value(self):
+            result = {}
+            for k, v in self._owner.validators.iteritems():
+                result[k] = v.value
+            return result
+
+        def __repr__(self):
+            return repr(self._value)
+
+        def __eq__(self, other):
+            return self._value == other
+
+        def __getitem__(self, key):
+            return self._owner.validators[key].value
+
+        def __setitem__(self, key, value):
+            self._owner.validators[key].process(value)
+
+        def __getattr__(self, name):
+            return self[name]
+
+        def __setattr__(self, name, value):
+            if name.startswith('_'):
+                super(Map._ValueProxy, self).__setattr__(name, value)
+            else:
+                self[name] = value
+
+        def keys(self):
+            return self._owner.validators.keys()
+
     def __init__(self, validators, strict_processing=True, **kwargs):
         super(Map, self).__init__(**kwargs)
         self.strict_processing = strict_processing
+        self.add_postprocessor(self.__postprocess)
         if hasattr(validators, '__validators__'):
             self.validators = self.__bind_validators(validators.__validators__)
         else:
             self.validators = self.__bind_validators(validators)
+
+    @staticmethod
+    def __postprocess(self, value):
+        for k, v in value.items():
+            if self.strict_processing or k in self.validators:
+                value[k] = self.validators[k].process(v)
+            else:
+                del value[k]
+        return self._ValueProxy(self)
 
     def __bind_validators(self, validators):
         bound = collections.OrderedDict()
@@ -589,15 +644,6 @@ class Map(Validator):
     @property
     def python_type(self):
         return dict
-
-    def process(self, value):
-        value = super(Map, self).process(value)
-        for k, v in (value or {}).items():
-            if self.strict_processing or k in self.validators:
-                value[k] = self.validators[k].process(v)
-            else:
-                del value[k]
-        return value
 
     def is_valid(self):
         status = super(Map, self).is_valid()
