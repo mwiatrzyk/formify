@@ -582,7 +582,7 @@ class Map(Validator):
         @property
         def _value(self):
             result = {}
-            for k, v in self._owner.validators.iteritems():
+            for k, v in self._owner._bound_validators.iteritems():
                 result[k] = v.value
             return result
 
@@ -593,10 +593,10 @@ class Map(Validator):
             return self._value == other
 
         def __getitem__(self, key):
-            return self._owner.validators[key].value
+            return self._owner._bound_validators[key].value
 
         def __setitem__(self, key, value):
-            self._owner.validators[key].process(value)
+            self._owner._bound_validators[key].process(value)
 
         def __getattr__(self, name):
             return self[name]
@@ -608,22 +608,23 @@ class Map(Validator):
                 self[name] = value
 
         def keys(self):
-            return self._owner.validators.keys()
+            return self._owner._bound_validators.keys()
 
     def __init__(self, validators, strict_processing=True, **kwargs):
         super(Map, self).__init__(**kwargs)
+        self.validators = validators
         self.strict_processing = strict_processing
         self.add_postprocessor(self.__postprocess)
         if hasattr(validators, '__validators__'):
-            self.validators = self.__bind_validators(validators.__validators__)
+            self._bound_validators = self.__bind_validators(validators.__validators__)
         else:
-            self.validators = self.__bind_validators(validators)
+            self._bound_validators = self.__bind_validators(validators)
 
     @staticmethod
     def __postprocess(self, value):
         for k, v in value.items():
-            if self.strict_processing or k in self.validators:
-                value[k] = self.validators[k].process(v)
+            if self.strict_processing or k in self._bound_validators:
+                value[k] = self._bound_validators[k].process(v)
             else:
                 del value[k]
         return self._ValueProxy(self)
@@ -635,11 +636,11 @@ class Map(Validator):
         return bound
 
     def __iter__(self):
-        for k in self.validators:
+        for k in self._bound_validators:
             yield k
 
     def __getitem__(self, key):
-        return self.validators[key]
+        return self._bound_validators[key]
 
     @property
     def python_type(self):
@@ -649,7 +650,7 @@ class Map(Validator):
         status = super(Map, self).is_valid()
         if not status:
             return False
-        for v in self.validators.itervalues():
+        for v in self._bound_validators.itervalues():
             if not v.is_valid():
                 status = False
         if not status:
