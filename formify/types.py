@@ -12,16 +12,9 @@ custom validator."""
 class DictMixin(object):
     """A mixin that provides other classes with dict-like interface.
 
-    This is the same as :class:`UserDict.DictMixin`, but created as new-style
-    class.
+    This is very similar to :class:`UserDict.DictMixin`, but ``__iter__`` must
+    be defined instead of ``keys`` and new-style class is used.
     """
-
-    def __iter__(self):
-        for k in self.keys():
-            yield k
-
-    def __contains__(self, key):
-        return self.has_key(key)
 
     def __cmp__(self, other):
         if other is None:
@@ -38,16 +31,14 @@ class DictMixin(object):
         return repr(dict(self.iteritems()))
 
     def has_key(self, key):
-        try:
-            self[key]
-        except KeyError:
-            return False
-        else:
-            return True
+        return key in self
 
     def iterkeys(self):
-        for k in self.keys():
+        for k in self:
             yield k
+
+    def keys(self):
+        return list(self.iterkeys())
 
     def iteritems(self):
         for k in self:
@@ -73,16 +64,16 @@ class DictMixin(object):
         return self[key]
 
     def pop(self, key, *default):
-        if key not in self:
-            if not default:
-                raise KeyError(key)
-            elif len(default) == 1:
-                return default[0]
-            else:
-                raise TypeError("pop expected at most 2 arguments, got %r" % (1 + len(default)))
-        value = self[key]
-        del self[key]
-        return value
+        if key in self:
+            value = self[key]
+            del self[key]
+            return value
+        elif not default:
+            raise KeyError(key)
+        elif len(default) == 1:
+            return default[0]
+        else:
+            raise TypeError("pop expected at most 2 arguments, got %r" % (1 + len(default)))
 
     def popitem(self):
         try:

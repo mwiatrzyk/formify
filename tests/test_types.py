@@ -19,6 +19,13 @@ class TestDictMixin(unittest.TestCase):
             def __init__(self, data=None):
                 self._storage = data or {}
 
+            def __iter__(self):
+                for k in self._storage:
+                    yield k
+
+            def __contains__(self, key):
+                return key in self._storage
+
             def __setitem__(self, key, value):
                 self._storage[key] = value
 
@@ -27,9 +34,6 @@ class TestDictMixin(unittest.TestCase):
 
             def __delitem__(self, key):
                 del self._storage[key]
-
-            def keys(self):
-                return self._storage.keys()
 
         self.UUT = UUT
         self.uut = UUT({1: 'one', 2: 'two', 3: 'three'})
