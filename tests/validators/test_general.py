@@ -689,3 +689,17 @@ class TestMap(unittest.TestCase):
         self.assertEqual('3', self.uut['b'].value)
 
         self.assertEqual({'a': 10, 'b': '3'}, dict(value))
+
+    def test_rawValueReflectsLastProcessedValue(self):
+        self.assertIs(self.uut.raw_value, None)
+
+        value = self.uut({'a': 1, 'b': 2})
+        self.assertEqual({'a': 1, 'b': 2}, self.uut.raw_value)
+
+        value.a = 2
+        self.assertEqual({'a': 2}, self.uut.raw_value)
+
+        value.b = 5
+        self.assertEqual({'b': 5}, self.uut.raw_value)
+
+        self.assertEqual({'a': 2, 'b': '5'}, self.uut.value)

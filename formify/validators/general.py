@@ -12,7 +12,7 @@ import decimal
 import datetime
 import collections
 
-from formify import exc
+from formify import exc, types
 from formify.decorators import message_formatter
 from formify.validators.base import Validator
 from formify.validators.mixins import LengthValidationMixin, RangeValidationMixin
@@ -566,7 +566,7 @@ class Map(Validator):
         'inner_validator_error': 'Inner validator has failed'
     })
 
-    class _ValueProxy(object):
+    class _ValueProxy(types.DictMixin):
 
         def __init__(self, owner):
             self._owner = owner
@@ -579,23 +579,15 @@ class Map(Validator):
         def _owner(self, value):
             self.__owner = weakref.ref(value)
 
-        @property
-        def _value(self):
-            result = {}
-            for k, v in self._owner._bound_validators.iteritems():
-                result[k] = v.value
-            return result
-
-        def __repr__(self):
-            return repr(self._value)
-
-        def __eq__(self, other):
-            return self._value == other
+        def __iter__(self):
+            for key in self._owner._bound_validators:
+                yield key
 
         def __getitem__(self, key):
             return self._owner._bound_validators[key].value
 
         def __setitem__(self, key, value):
+            self._owner.raw_value = {key: value}
             self._owner._bound_validators[key].process(value)
 
         def __getattr__(self, name):
@@ -606,9 +598,6 @@ class Map(Validator):
                 super(Map._ValueProxy, self).__setattr__(name, value)
             else:
                 self[name] = value
-
-        def keys(self):
-            return self._owner._bound_validators.keys()
 
     def __init__(self, validators, strict_processing=True, **kwargs):
         super(Map, self).__init__(**kwargs)
@@ -622,11 +611,10 @@ class Map(Validator):
 
     @staticmethod
     def __postprocess(self, value):
+        result = self._ValueProxy(self)
         for k, v in value.items():
             if self.strict_processing or k in self._bound_validators:
-                value[k] = self._bound_validators[k].process(v)
-            else:
-                del value[k]
+                self._bound_validators[k].process(v)
         return self._ValueProxy(self)
 
     def __bind_validators(self, validators):
