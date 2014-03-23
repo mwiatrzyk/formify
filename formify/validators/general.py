@@ -319,19 +319,19 @@ class AnyOf(Validator):
         self.validators = validators
         super(AnyOf, self).__init__(**kwargs)
 
-    def process(self, value):
+    def __call__(self, value):
         self.raw_value = value
         self._index_of_current = -1
         self._bound_validators = [x(owner=self) for x in self.validators]
         for i, validator in enumerate(self._bound_validators):
-            if validator.process(value) is not None:
+            if validator(value) is not None:
                 self._index_of_current = i
                 return self.value
 
     def try_validate(self, value):
         for i in xrange(self._index_of_current, len(self._bound_validators)):
             validator = self._bound_validators[i]
-            if validator.process(value) is not None:
+            if validator(value) is not None:
                 if validator.is_valid():
                     self._index_of_current = i
                     return True
@@ -533,7 +533,7 @@ class List(Validator, LengthValidationMixin):
         validators = []
         for v in (value or []):
             validator = self.validator(owner=self)
-            validator.process(v)
+            validator(v)
             validators.append(validator)
         return validators
 
@@ -588,7 +588,7 @@ class Map(Validator):
 
         def __setitem__(self, key, value):
             self._owner.raw_value = {key: value}
-            self._owner._bound_validators[key].process(value)
+            self._owner._bound_validators[key](value)
 
         def __getattr__(self, name):
             return self[name]
@@ -629,7 +629,7 @@ class Map(Validator):
         value = super(Map, self).postprocess(value)
         for k, v in value.items():
             if self.strict_processing or k in self._bound_validators:
-                self._bound_validators[k].process(v)
+                self._bound_validators[k](v)
         return self._ValueProxy(self)
 
     def is_valid(self):

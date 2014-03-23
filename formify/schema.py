@@ -77,7 +77,7 @@ class Schema(object):
         elif name not in self:
             raise AttributeError("unable to set attribute: %s" % name)
         else:
-            self[name].process(value)
+            self[name](value)
 
     def __getattribute__(self, name):
         if name.startswith('_') or name not in self:

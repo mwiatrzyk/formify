@@ -165,24 +165,18 @@ class Validator(BaseValidator):
         self.standalone = standalone
         if messages is not None:
             self.__update_messages(messages)
-        self.process(_utils.maybe_callable(default))
+        self(_utils.maybe_callable(default))
 
     def __update_messages(self, messages):
         self.messages = dict(self.__class__.messages)
         self.messages.update(messages)
 
     def __call__(self, value):
-        """Calls :meth:`process`."""
-        return self.process(value)
+        """Convert input value to instance of :attr:`python_type`.
 
-    def process(self, value):
-        """Process input value.
-
-        This method is responsible for conversion of input value to
-        :attr:`python_type` type object. Calling this method will reset
-        previous validator state, i.e. :attr:`errors`, :attr:`raw_value` and
-        :attr:`value` properties and set up them according to processing result
-        of ``value``.
+        Calling this method will reset previous validator state, i.e.
+        :attr:`errors`, :attr:`raw_value` and :attr:`value` properties, and set
+        them up according to processing result for ``value``.
 
         If processing was successful, converted value is returned and
         validator's :attr:`value` is initialized with it. Otherwise, ``None``
