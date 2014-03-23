@@ -522,8 +522,8 @@ class List(Validator, LengthValidationMixin):
     def python_type(self):
         return list
 
-    def process(self, value):
-        value = super(List, self).process(value)
+    def postprocess(self, value):
+        value = super(List, self).postprocess(value)
         self._value_validators = self.__create_value_validators(value)
         for i, validator in enumerate(self._value_validators):
             value[i] = validator.value
