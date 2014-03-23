@@ -101,20 +101,12 @@ class Schema(object):
         validators = collections.OrderedDict()
         for k, v in self.__class__.__validators__.iteritems():
             bound = v(owner=self)
-            bound.preprocessors = self.__get_preprocessors_for(k)
-            bound.postprocessors = self.__get_postprocessors_for(k)
+            for x in self.__class__.__preprocessors__.get(k, []):
+                bound.add_preprocessor(functools.partial(x, self))
+            for x in self.__class__.__postprocessors__.get(k, []):
+                bound.add_postprocessor(functools.partial(x, self))
             validators[k] = bound
         return validators
-
-    def __get_preprocessors_for(self, key):
-        return [
-            functools.partial(x, self)
-            for x in self.__class__.__preprocessors__.get(key, [])]
-
-    def __get_postprocessors_for(self, key):
-        return [
-            functools.partial(x, self)
-            for x in self.__class__.__postprocessors__.get(key, [])]
 
     @property
     def errors(self):
