@@ -603,19 +603,10 @@ class Map(Validator):
         super(Map, self).__init__(**kwargs)
         self.validators = validators
         self.strict_processing = strict_processing
-        self.add_postprocessor(self.__postprocess)
         if hasattr(validators, '__validators__'):
             self._bound_validators = self.__bind_validators(validators.__validators__)
         else:
             self._bound_validators = self.__bind_validators(validators)
-
-    @staticmethod
-    def __postprocess(self, value):
-        result = self._ValueProxy(self)
-        for k, v in value.items():
-            if self.strict_processing or k in self._bound_validators:
-                self._bound_validators[k].process(v)
-        return self._ValueProxy(self)
 
     def __bind_validators(self, validators):
         bound = collections.OrderedDict()
@@ -633,6 +624,13 @@ class Map(Validator):
     @property
     def python_type(self):
         return dict
+
+    def postprocess(self, value):
+        value = super(Map, self).postprocess(value)
+        for k, v in value.items():
+            if self.strict_processing or k in self._bound_validators:
+                self._bound_validators[k].process(v)
+        return self._ValueProxy(self)
 
     def is_valid(self):
         status = super(Map, self).is_valid()

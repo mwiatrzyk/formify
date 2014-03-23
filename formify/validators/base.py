@@ -192,10 +192,10 @@ class Validator(BaseValidator):
         self.errors = []
         self.raw_value = self.__copy_if_mutable(value)
         if self.__needs_conversion(value):
-            value = self.run_preprocessors(value)
+            value = self.preprocess(value)
             value = self.try_convert(value)
         if value is not None:
-            value = self.run_postprocessors(value)
+            value = self.postprocess(value)
         self.value = value
         return value
 
@@ -208,13 +208,13 @@ class Validator(BaseValidator):
     def __needs_conversion(self, value):
         return value is not None and not isinstance(value, self.python_type)
 
-    def run_preprocessors(self, value):
+    def preprocess(self, value):
         """Execute chain of preprocessors on given value."""
         for func in self.preprocessors:
             value = func(self, value)
         return value
 
-    def run_postprocessors(self, value):
+    def postprocess(self, value):
         """Execute chain of postprocessors on given value."""
         for func in self.postprocessors:
             value = func(self, value)
