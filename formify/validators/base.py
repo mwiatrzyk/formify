@@ -190,8 +190,14 @@ class Validator(BaseValidator):
             value = self.try_convert(value)
         if value is not None:
             value = self.postprocess(value)
-        self.value = value
-        return value
+        try:
+            self.value = value
+        except AttributeError:
+            pass  # in case when value is @property decorated and read only
+        if value is None:
+            return value
+        else:
+            return self.value
 
     def __copy_if_mutable(self, value):
         if _utils.is_mutable(value):

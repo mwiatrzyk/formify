@@ -625,12 +625,16 @@ class Map(Validator):
     def python_type(self):
         return dict
 
+    @property
+    def value(self):
+        return self._ValueProxy(self)
+
     def postprocess(self, value):
         value = super(Map, self).postprocess(value)
         for k, v in value.items():
             if self.strict_processing or k in self._bound_validators:
                 self._bound_validators[k](v)
-        return self._ValueProxy(self)
+        return value
 
     def is_valid(self):
         status = super(Map, self).is_valid()

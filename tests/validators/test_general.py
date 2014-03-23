@@ -630,9 +630,7 @@ class TestMap(unittest.TestCase):
         self.assertEqual({'a': 1, 'b': '2'}, uut.value)
 
     def test_ifUnableToConvertToDict_processingFails(self):
-        self.uut(123)
-
-        self.assertIs(self.uut.value, None)
+        self.assertIs(self.uut(123), None)
 
     def test_whenIterating_yieldsKeys(self):
         self.assertEqual(['a', 'b'], list(self.uut))
@@ -703,3 +701,6 @@ class TestMap(unittest.TestCase):
         self.assertEqual({'b': 5}, self.uut.raw_value)
 
         self.assertEqual({'a': 2, 'b': '5'}, self.uut.value)
+
+    def test_defaultValue(self):
+        self.assertEqual({'a': None, 'b': None}, self.uut.value)
