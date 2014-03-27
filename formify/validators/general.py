@@ -587,7 +587,6 @@ class Map(Validator):
             return self._owner._bound_validators[key].value
 
         def __setitem__(self, key, value):
-            self._owner.raw_value = {key: value}
             self._owner._bound_validators[key](value)
 
         def __getattr__(self, name):
@@ -637,7 +636,7 @@ class Map(Validator):
         return value
 
     def is_valid(self):
-        status = super(Map, self).is_valid()
+        status = True
         if not status:
             return False
         for v in self._bound_validators.itervalues():

@@ -629,8 +629,21 @@ class TestMap(unittest.TestCase):
 
         self.assertEqual({'a': 1, 'b': '2'}, uut.value)
 
+    def test_ifAllInnerValidatorsAreValid_validatorIsValid(self):
+        self.assertFalse(self.uut.is_valid())
+
+        self.uut({'a': 1, 'b': 2})
+        self.assertTrue(self.uut.is_valid())
+
+        self.uut.value.a = 'abc'
+        self.assertFalse(self.uut.is_valid())
+
+        self.uut.value.a = '1'
+        self.assertTrue(self.uut.is_valid())
+
     def test_ifUnableToConvertToDict_processingFails(self):
         self.assertIs(self.uut(123), None)
+        self.assertFalse(self.uut.is_valid())
 
     def test_whenIterating_yieldsKeys(self):
         self.assertEqual(['a', 'b'], list(self.uut))
@@ -688,19 +701,12 @@ class TestMap(unittest.TestCase):
 
         self.assertEqual({'a': 10, 'b': '3'}, dict(value))
 
-    def test_rawValueReflectsLastProcessedValue(self):
-        self.assertIs(self.uut.raw_value, None)
-
-        value = self.uut({'a': 1, 'b': 2})
-        self.assertEqual({'a': 1, 'b': 2}, self.uut.raw_value)
-
-        value.a = 2
-        self.assertEqual({'a': 2}, self.uut.raw_value)
-
-        value.b = 5
-        self.assertEqual({'b': 5}, self.uut.raw_value)
-
-        self.assertEqual({'a': 2, 'b': '5'}, self.uut.value)
-
     def test_defaultValue(self):
         self.assertEqual({'a': None, 'b': None}, self.uut.value)
+
+    def test_processValueUsingNestedValidator(self):
+        self.uut['a'](123)
+        self.assertEqual({'a': 123, 'b': None}, self.uut.value)
+
+        self.uut['b'](456)
+        self.assertEqual({'a': 123, 'b': '456'}, self.uut.value)
