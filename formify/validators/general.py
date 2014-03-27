@@ -555,11 +555,6 @@ class Map(Validator):
     :param validators:
         map of validators. This can be dict or :class:`~formify.schema.Schema`
         class object.
-    :param strict_processing:
-        enable or disable strict processing of input data. If strict processing
-        is enabled (default), any key given in input data that does not have
-        corresponding validator will cause :exc:`KeyError` to be raised. If
-        strict processing is disabled such keys will be silently ignored.
     """
 
     class _ValueProxy(types.DictMixin):
@@ -594,10 +589,9 @@ class Map(Validator):
             else:
                 self[name] = value
 
-    def __init__(self, validators, strict_processing=True, **kwargs):
+    def __init__(self, validators, **kwargs):
         super(Map, self).__init__(**kwargs)
         self.validators = validators
-        self.strict_processing = strict_processing
         if hasattr(validators, '__validators__'):
             self._bound_validators = self.__bind_validators(validators.__validators__)
         else:
@@ -627,8 +621,7 @@ class Map(Validator):
     def postprocess(self, value):
         value = super(Map, self).postprocess(value)
         for k, v in value.items():
-            if self.strict_processing or k in self._bound_validators:
-                self._bound_validators[k](v)
+            self._bound_validators[k](v)
         return value
 
     def is_valid(self):
