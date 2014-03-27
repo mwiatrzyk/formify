@@ -641,6 +641,14 @@ class TestMap(unittest.TestCase):
         self.uut.value.a = '1'
         self.assertTrue(self.uut.is_valid())
 
+    def test_ifContainsErrors_validationFails(self):
+        uut = formify.Map({'a': formify.Integer(optional=True)}, standalone=True)
+        self.assertTrue(uut.is_valid())
+
+        uut('abc')
+        self.assertEqual(1, len(uut.errors))
+        self.assertFalse(uut.is_valid())
+
     def test_ifUnableToConvertToDict_processingFails(self):
         self.assertIs(self.uut(123), None)
         self.assertFalse(self.uut.is_valid())

@@ -561,10 +561,6 @@ class Map(Validator):
         corresponding validator will cause :exc:`KeyError` to be raised. If
         strict processing is disabled such keys will be silently ignored.
     """
-    messages = dict(Validator.messages)
-    messages.update({
-        'inner_validator_error': 'Inner validator has failed'
-    })
 
     class _ValueProxy(types.DictMixin):
 
@@ -636,12 +632,10 @@ class Map(Validator):
         return value
 
     def is_valid(self):
-        status = True
-        if not status:
+        if self.errors:
             return False
+        status = True
         for v in self._bound_validators.itervalues():
             if not v.is_valid():
                 status = False
-        if not status:
-            self.add_error('inner_validator_error')
         return status
