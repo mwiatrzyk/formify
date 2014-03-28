@@ -380,7 +380,10 @@ class BaseChoice(Validator):
 
     @options.setter
     def options(self, value):
-        self._options = collections.OrderedDict(value)
+        try:
+            self._options = collections.OrderedDict(value)
+        except ValueError:
+            self._options = collections.OrderedDict([(k, k) for k in value])
 
 
 class Choice(BaseChoice):

@@ -435,6 +435,11 @@ class TestBaseChoice(unittest.TestCase):
         self.assertIsInstance(uut.options, collections.OrderedDict)
         self.assertEqual({1: 'One'}, uut.options)
 
+    def test_createWithSequenceAsOptions(self):
+        uut = formify.BaseChoice(['foo', 'bar'], standalone=True)
+        self.assertIsInstance(uut.options, collections.OrderedDict)
+        self.assertEqual({'foo': 'foo', 'bar': 'bar'}, uut.options)
+
 
 class TestChoice(unittest.TestCase):
     options = {
