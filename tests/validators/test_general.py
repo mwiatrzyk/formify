@@ -468,6 +468,11 @@ class TestChoice(unittest.TestCase):
         self.assertFalse(uut.is_valid())
         self.assertIn('Invalid option: 3', uut.errors)
 
+    def test_returnDefaultValueIfGiven(self):
+        uut = formify.Choice(self.options, key_type=int, default='1', standalone=True)
+        self.assertTrue(uut.is_valid())
+        self.assertEqual(1, uut.value)
+
 
 class TestMultiChoice(unittest.TestCase):
     options = {
@@ -713,3 +718,6 @@ class TestMap(unittest.TestCase):
 
         self.uut['b'](456)
         self.assertEqual({'a': 123, 'b': '456'}, self.uut.value)
+
+
+# vim: expandtab

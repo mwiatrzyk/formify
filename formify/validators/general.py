@@ -369,9 +369,9 @@ class BaseChoice(Validator):
     """
 
     def __init__(self, options, key_type=str, **kwargs):
+        self.key_type = key_type
         super(BaseChoice, self).__init__(**kwargs)
         self.options = options
-        self.key_type = key_type
 
     @property
     def options(self):
