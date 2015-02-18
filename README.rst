@@ -45,4 +45,5 @@ License
 Formify is distributed under the `MIT license
 <http://opensource.org/licenses/mit-license.php>`_.
 
-[![Build Status](https://travis-ci.org/tesseract/formify.svg?branch=master)](https://travis-ci.org/tesseract/formify)
+.. image:: https://travis-ci.org/tesseract/formify.svg?branch=master
+    :target: https://travis-ci.org/tesseract/formify
